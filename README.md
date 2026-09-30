@@ -8,29 +8,38 @@ Sweeps models × quantizations × backends on the actual hardware and publishes 
 AMD Ryzen AI Max+ 395 (Strix Halo): 16C/32T, Radeon 8060S iGPU (RDNA 3.5, 40 CUs), **128 GB unified LPDDR5X-8000 (~256 GB/s)**, 2 TB NVMe.
 
 - Workhorse for LLMs: the **iGPU** (Vulkan or ROCm). The 50 TOPS XDNA 2 NPU is not a practical LLM path today — don't plan around it.
-- Memory: unified — the iGPU can be allocated most of the 128 GB. Target a **64–96 GB iGPU allocation** (BIOS/firmware "UMA framebuffer" if exposed, else kernel tuning); keep 32 GB+ for the system. Verify per run: `cat /sys/class/drm/card0/device/mem_info_vram_total`.
-- Ceiling rule of thumb: gen tok/s ≈ 256 GB/s ÷ model size in GB (attention overhead aside).
+- Memory: unified — the iGPU can be allocated most of the 128 GB. Verified 2026-09-30: **96 GiB iGPU allocation** (`cat /sys/class/drm/card0/device/mem_info_vram_total` → 103,079,215,104 B), ~30 GiB left for the system. Verify per run.
+- Ceiling rule of thumb (dense models): gen tok/s ≈ 256 GB/s ÷ model size in GB. MoE models only move *active* weights through the FFN path, so they beat this ceiling — attention and kernel overhead set the real floor.
 
-## Software
-- OS: **Linux (Ubuntu 24.04)** — practical path for llama.cpp/Ollama/ROCm.
-- **Backend A (reference): llama.cpp Vulkan** (`-ngl 99`, 16 physical threads).
-- **Backend B: ROCm (gfx1151)** — Strix Halo may need recent ROCm (6.3+) or `HSA_OVERRIDE_GFX_VERSION=11.5.0`; if unstable, Vulkan stays the reference and ROCm becomes a bonus axis, not a blocker.
+## Software (verified on this box, 2026-09-30)
+- OS: **Linux — CachyOS (Arch-based), kernel 7.2.8**. (This README originally said Ubuntu 24.04; the suite is OS-agnostic and both stacks below are verified on this OS — see `docs/env.md`.)
+- llama.cpp: `~/.local/opt/llama.cpp` @ commit **`5b59b83f4`** — pinned for all runs (PLAN.md, decision D2).
+- **Backend A (reference): Vulkan** — `~/.local/opt/llama.cpp/build-vulkan` (Mesa 26.2.3 RADV, `RADV STRIX_HALO`), `-ngl 99`, 16 physical threads.
+- **Backend B: ROCm 7.2.4** — `~/.local/opt/llama.cpp/build` (HIP, ROCm-WMMA flash-attention, graphs on, VMM off). `rocminfo` sees **gfx1151 natively** — no `HSA_OVERRIDE_GFX_VERSION` needed; kept as a fallback if an op misbehaves.
 - Ollama/LM Studio: for a later "deployment experience" comparison, not the benchmark path.
 
-## Benchmark matrix (GGUF unless noted)
-| Tier | Model | Quant | Size (approx) | Planning tok/s (VALIDATE — these are estimates) |
+## Benchmark matrix (GGUF — on-disk models only, per decision D1)
+| Tier | Model | Quant | File size | Notes |
 |---|---|---|---|---|
-| Small / routing | gpt-oss-20b (MoE) | native MXFP4 | ~13 GB | 25–45 |
-| Small / routing | Qwen3-30B-A3B (MoE) | Q4_K_M | ~18 GB | 20–35 |
-| Tiny | Qwen3-4B / Phi-4-mini 3.8B | Q8_0 | ~4–5 GB | 40+ |
-| Mid | Llama 3.1 8B | Q8_0 | ~8.5 GB | 20–30 |
-| Mid | Qwen3-32B | Q5_K_M | ~20 GB | 7–10 |
-| Mid | Mistral Small 3.2 24B | Q4_K_M | ~15 GB | 8–14 |
-| Mid | Gemma 3 27B | Q4_K_M | ~17 GB | 8–12 |
-| Big | Llama 3.3 70B | Q4_K_M | ~42 GB | 4–7 |
-| Big | gpt-oss-120b (MoE) | native MXFP4 | ~61 GB | 4–8 |
+| Big | gpt-oss-120b (MoE) | native MXFP4 | ~59 GB | headline "120B on a 128 GB APU" cell |
+| MoE mid | Qwen3.5-35B-A3B | Q6_K | ~27 GB | ~3B active |
+| MoE mid | qwen3-coder-30b-a3b-instruct | Q6_K | ~23 GB | ~3B active |
+| Mid | Qwen3.8-27B (UD) | Q5_K_XL | ~19 GB | dense; quant-pair row |
+| Mid | Qwen3.8-27B (UD) | Q6_K | ~20.5 GB | dense; quant-pair row |
 
-Planning numbers assume ~256 GB/s unified bandwidth plus community reports for Strix Halo. The suite exists to replace them with measured values.
+Machine-readable version: `matrix.yaml`. Models live in `~/.local/share/models/`. No downloads in this round — the original wider matrix is kept below as future cells (needs downloads + an HF token for the gated repos).
+
+### Future cells (needs download + HF token — not in the current run)
+| Tier | Model | Quant | Size (approx) |
+|---|---|---|---|
+| Small / routing | gpt-oss-20b (MoE) | native MXFP4 | ~13 GB |
+| Small / routing | Qwen3-30B-A3B (MoE) | Q4_K_M | ~18 GB |
+| Tiny | Qwen3-4B / Phi-4-mini 3.8B | Q8_0 | ~4–5 GB |
+| Mid | Llama 3.1 8B | Q8_0 | ~8.5 GB |
+| Mid | Qwen3-32B | Q5_K_M | ~20 GB |
+| Mid | Mistral Small 3.2 24B | Q4_K_M | ~15 GB |
+| Mid | Gemma 3 27B | Q4_K_M | ~17 GB |
+| Big | Llama 3.3 70B | Q4_K_M | ~42 GB |
 
 ## Metrics per cell
 - Generation tok/s (sustained, 512-token outputs), prompt-processing tok/s
@@ -42,7 +51,7 @@ Planning numbers assume ~256 GB/s unified bandwidth plus community reports for S
 Small, version-controlled, ~50–100 items:
 - EN: strict-JSON extraction, function-calling correctness, summarization, math subset (GSM8K-style)
 - FI: Finnish summarization, Finnish extraction (invoice fields), FI grammar/translation, FI chat Q&A
-- Embeddings: **bge-m3** (FI-supported) vs nomic-embed-text (EN-centric) on a Finnish retrieval set — this decides the Finnish RAG stack
+- Embeddings: **bge-m3** (FI-supported) vs nomic-embed-text (EN-centric) on a Finnish retrieval set — this decides the Finnish RAG stack. **Deferred: needs model downloads** (no-download constraint / no HF token at the moment).
 
 ## Deliverables
 - [ ] Benchmark script (llama.cpp CLI or Python bindings), one-command run
@@ -52,4 +61,4 @@ Small, version-controlled, ~50–100 items:
 - [ ] Headline post candidate: "A 120B-class model on a 128 GB APU — what actually runs"
 
 ## Status
-Not started.
+In progress — plan in [PLAN.md](PLAN.md). Toolchain, builds, and all five matrix models are already provisioned on this box (2026-09-30); the benchmark harness is the next step.

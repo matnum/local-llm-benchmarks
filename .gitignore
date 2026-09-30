@@ -1,0 +1,12 @@
+# model weights — never in git (live in ~/.local/share/models/)
+*.gguf
+models/
+
+# per-run raw outputs (consolidated.csv + table.md stay tracked)
+results/run-*/
+
+# misc
+__pycache__/
+*.pyc
+*.log
+.DS_Store

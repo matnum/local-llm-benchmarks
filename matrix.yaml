@@ -1,0 +1,58 @@
+# Frozen benchmark matrix — ON-DISK models only (decision D1: no downloads).
+# Sizes are the exact GGUF files in ~/.local/share/models/ (verified 2026-09-30).
+# Bench params are per-cell overridable; defaults below are the sweep standard.
+
+defaults:
+  backends: [vulkan, rocm]        # vulkan = build-vulkan (reference), rocm = build (HIP)
+  gpu_layers: all
+  threads_cpu: 16                 # physical threads, Vulkan CPU-side
+  ctx_size: 8192
+  pp_tokens: [512, 2048]          # prompt-processing sweep points
+  tg_tokens: 512                  # generation length (README: 512-token outputs)
+  repeats: 3
+  warmup_requests: 1              # TTFT probe: discard first timed request
+  power_sample_hz: 5
+
+cells:
+  - id: gpt-oss-120b-mxfp4
+    tier: big
+    model: gpt-oss-120b
+    arch: moe
+    quant: MXFP4 (native)
+    file: /home/halo/.local/share/models/gpt-oss-120b/gpt-oss-120b-MXFP4.gguf
+    size_gib: 59.0
+    note: headline "120B on a 128 GB APU" cell
+
+  - id: qwen3.5-35b-a3b-q6_k
+    tier: moe-mid
+    model: Qwen3.5-35B-A3B
+    arch: moe
+    quant: Q6_K
+    file: /home/halo/.local/share/models/Qwen3.5-35B-A3B-Q6_K.gguf
+    size_gib: 26.9
+
+  - id: qwen3-coder-30b-a3b-q6_k
+    tier: moe-mid
+    model: qwen3-coder-30b-a3b-instruct
+    arch: moe
+    quant: Q6_K
+    file: /home/halo/.local/share/models/qwen3-coder-30b-a3b-instruct-q6_k.gguf
+    size_gib: 23.4
+
+  - id: qwen3.8-27b-q5_k_xl
+    tier: mid
+    model: Qwen3.8-27B (Unsloth dynamic)
+    arch: dense
+    quant: Q5_K_XL
+    file: /home/halo/.local/share/models/Qwen3.8-27B-UD-Q5_K_XL.gguf
+    size_gib: 19.4
+    note: quant-pair row (vs qwen3.8-27b-q6_k)
+
+  - id: qwen3.8-27b-q6_k
+    tier: mid
+    model: Qwen3.8-27B (Unsloth dynamic)
+    arch: dense
+    quant: Q6_K
+    file: /home/halo/.local/share/models/qwen3.8-27b/Qwen3.8-27B-UD-Q6_K.gguf
+    size_gib: 20.5
+    note: quant-pair row (vs qwen3.8-27b-q5_k_xl)

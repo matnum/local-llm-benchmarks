@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""One-command benchmark sweep driver.
+
+Usage:
+  run_sweep.py --backend {vulkan,rocm} [--cells id1,id2] [--repeats 3]
+               [--pp-tokens 512,2048] [--tg-tokens 512] [--port 11500]
+               [--force] [--rocm-override]
+
+Per cell: idle-check GPU -> start resource sampler -> llama-bench (pp/tg)
+-> llama-server + TTFT probe -> aggregate to results/run-*/<cell>/cell.json.
+After all cells: update results/consolidated.csv and render results/table.md.
+
+Contamination rule: the GPU must be idle (busy < 5%, VRAM < 4 GiB) unless
+--force. Stop the dev llama-server (:11436) before real sweeps.
+stdlib + PyYAML only.
+"""
+import argparse
+import csv
+import glob
+import json
+import os
+import re
+import signal
+import statistics
+import subprocess
+import sys
+import time
+
+try:
+    import yaml
+except ImportError as _e:  # M4: PyYAML is required; the shebang's python3 may lack it.
+    sys.stderr.write(
+        "run_sweep.py: PyYAML is required but not importable "
+        f"({_e}).\n"
+        "  Run with a python that has it (e.g. /usr/bin/python3), or:\n"
+        "    pip install PyYAML   # or: pip install -r requirements.txt\n"
+    )
+    raise
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LLAMA_CPP = os.path.expanduser("~/.local/opt/llama.cpp")
+BUILDS = {"vulkan": f"{LLAMA_CPP}/build-vulkan/bin", "rocm": f"{LLAMA_CPP}/build/bin"}
+GIB = 1024 ** 3
+IDLE_BUSY_PCT = 5
+IDLE_VRAM_GIB = 4.0
+
+
+def log(msg):
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def rd(path, default=0):
+    try:
+        with open(path) as f:
+            return int(f.read().strip())
+    except Exception:
+        return default
+
+
+def gpu_idle():
+    busy = rd("/sys/class/drm/card0/device/gpu_busy_percent")
+    vram = rd("/sys/class/drm/card0/device/mem_info_vram_used") / GIB
+    return busy < IDLE_BUSY_PCT and vram < IDLE_VRAM_GIB, busy, vram
+
+
+def killpg(proc):
+    if proc.poll() is None:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            proc.wait(timeout=10)
+        except Exception:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+
+
+def run_bench(binpath, model, repeats, p, n, logf, env=None):
+    """One llama-bench invocation; returns {test: [tps, ...]}.
+
+    NOTE (B1): the pinned llama.cpp build (5b59b83f4) llama-bench has NO -c/--ctx
+    flag, so the bench runs at the model's default context (4096), NOT the sweep's
+    requested --ctx. The effective context is recorded separately in run.json
+    (bench_ctx) so the data is never silently mislabeled.
+    """
+    cmd = [f"{binpath}/llama-bench", "-m", model,
+           "-ngl", "99", "-t", "16", "-p", str(p), "-n", str(n), "-r", str(repeats)]
+    log("  ".join(cmd))
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
+    logf.write(out.stdout + "\n--- stderr ---\n" + out.stderr + "\n")
+    logf.flush()
+    tests = {}
+    for line in out.stdout.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        for i, c in enumerate(cells):
+            if re.fullmatch(r"(pp|tg)\d+", c) and i + 1 < len(cells):
+                m = re.match(r"([\d.]+)", cells[i + 1])
+                if m:
+                    tests.setdefault(c, []).append(float(m.group(1)))
+    if not tests:
+        raise RuntimeError("llama-bench produced no parseable rows")
+    return tests
+
+
+def wait_health(base, timeout=600):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            import urllib.request
+            with urllib.request.urlopen(base + "/health", timeout=3) as r:
+                if r.status == 200:
+                    return
+        except Exception:
+            time.sleep(2)
+    raise RuntimeError(f"server not healthy within {timeout}s")
+
+
+def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None):
+    logf = open(f"{cdir}/bench.log", "w")
+    try:
+        results = {}
+        for p in pp_tokens:
+            results.update(run_bench(binpath, cell["file"], repeats, p, 0, logf, env))
+        results.update(run_bench(binpath, cell["file"], repeats, 0, tg_tokens, logf, env))
+    finally:
+        logf.close()
+    return {k: {"mean": round(statistics.fmean(v), 2), "repeats": v} for k, v in results.items()}
+
+
+def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None):
+    srv = subprocess.Popen(
+        [f"{binpath}/llama-server", "-m", cell["file"], "--host", "127.0.0.1",
+         "--port", str(port), "-c", str(ctx), "-ngl", "99", "-t", "16",
+         "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0", "-np", "1",
+         "--alias", cell["id"]],
+        stdout=open(f"{cdir}/server.log", "w"), stderr=subprocess.STDOUT,
+        start_new_session=True, env=env)
+    try:
+        base = f"http://127.0.0.1:{port}"
+        # M7: server startup (load + weight load) scales with model size; give the
+        # 59 GB gpt-oss-120b cell more room than the 19–27 GB ones.
+        timeout = 900 + int(cell["size_gib"]) * 15
+        wait_health(base, timeout=timeout)
+        ts = time.time()
+        subprocess.run([sys.executable, f"{REPO}/scripts/ttft_probe.py", base,
+                        cell["id"], "1", str(repeats), str(tg_tokens),
+                        f"{cdir}/ttft.json"], check=True, timeout=3600)
+        ts_end = time.time()
+        with open(f"{cdir}/ttft.json") as f:
+            ttft = json.load(f)
+        return ttft, ts, ts_end
+    finally:
+        killpg(srv)
+
+
+def window_stats(rows, t0, t1):
+    sel = [r for r in rows if t0 <= float(r["ts"]) <= t1]
+    if not sel:
+        return None
+    return {
+        "power_w_mean": round(statistics.fmean(float(r["power_w"]) for r in sel), 1),
+        "power_w_max": round(max(float(r["power_w"]) for r in sel), 1),
+        "temp_c_max": round(max(float(r["temp_c"]) for r in sel), 1),
+        "vram_gib_max": round(max(float(r["vram_used_gib"]) for r in sel), 2),
+        "sys_avail_gib_min": round(min(float(r["sys_avail_gib"]) for r in sel), 2),
+    }
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--backend", required=True, choices=["vulkan", "rocm"])
+    ap.add_argument("--cells", default="", help="comma-separated cell ids (default: all)")
+    ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--pp-tokens", default="512,2048")
+    ap.add_argument("--tg-tokens", type=int, default=512)
+    ap.add_argument("--port", type=int, default=11500)
+    ap.add_argument("--ctx", type=int, default=8192)
+    ap.add_argument("--force", action="store_true", help="skip idle check")
+    ap.add_argument("--rocm-override", action="store_true",
+                    help="set HSA_OVERRIDE_GFX_VERSION=11.5.0")
+    args = ap.parse_args()
+
+    env = dict(os.environ)
+    if args.rocm_override:
+        env["HSA_OVERRIDE_GFX_VERSION"] = "11.5.0"
+
+    with open(f"{REPO}/matrix.yaml") as f:
+        matrix = yaml.safe_load(f)
+    pp_tokens = [int(x) for x in args.pp_tokens.split(",")]
+    cells = [c for c in matrix["cells"]
+             if not args.cells or c["id"] in args.cells.split(",")]
+
+    run_id = time.strftime("run-%Y%m%d-%H%M")
+    rdir = f"{REPO}/results/{run_id}/{args.backend}"
+    os.makedirs(rdir, exist_ok=True)
+    try:
+        commit = subprocess.run(["git", "-C", LLAMA_CPP, "rev-parse", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
+    except Exception:
+        commit = "unknown"
+    # B1: the pinned llama-bench has NO -c/--ctx flag, so bench runs at the model's
+    # default context (4096). The server (llama-server) DOES accept -c and runs at
+    # args.ctx. Record both so the data is never silently mislabeled.
+    meta = {"run_id": run_id, "ts": time.time(), "backend": args.backend,
+            "llama_cpp_commit": commit, "cells": [c["id"] for c in cells],
+            "repeats": args.repeats, "tg_tokens": args.tg_tokens,
+            "pp_tokens": pp_tokens,
+            "ctx_server": args.ctx,
+            "ctx_bench": "model-default (4096)",
+            "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
+                              "bench tok/s measured at model default ctx, not ctx_server",
+            "forced": args.force}
+    json.dump(meta, open(f"{rdir}/run.json", "w"), indent=1)
+    log(f"run {run_id} backend={args.backend} cells={[c['id'] for c in cells]} "
+        f"(bench ctx = model default; server ctx = {args.ctx})")
+
+    def check_idle(tag):
+        """Idle gate (I3): GPU must be idle before each cell, not just once.
+
+        Returns True to proceed; False means hard-fail (caller exits). --force
+        downgrades to a contamination warning rather than a stop.
+        """
+        ok, busy, vram = gpu_idle()
+        if not ok:
+            if not args.force:
+                log(f"[{tag}] GPU NOT idle (busy={busy}%, vram={vram:.1f} GiB) — "
+                    "stop the dev llama-server (:11436) and rerun, or pass --force")
+                return False
+            log(f"[{tag}] GPU not idle (busy={busy}%, vram={vram:.1f} GiB) but --force: "
+                "continuing, this cell's results are CONTAMINATED")
+        return True
+
+    # M6: fail fast on a missing/renamed GGUF instead of dying minutes deep in the sweep.
+    for cell in cells:
+        if not os.path.isfile(cell["file"]):
+            log(f"ERROR: model file missing for {cell['id']}: {cell['file']}")
+            sys.exit(3)
+
+    if not check_idle("start"):
+        sys.exit(2)
+
+    for cell in cells:
+        # I3: re-check per cell — a 10-cell sweep spans hours; a background process
+        # that starts mid-sweep must not silently contaminate later cells.
+        if not check_idle(f"cell {cell['id']}"):
+            sys.exit(2)
+        cdir = f"{rdir}/{cell['id']}"
+        os.makedirs(cdir, exist_ok=True)
+        log(f"=== {cell['id']} ({cell['quant']}, {cell['size_gib']} GiB) ===")
+        sampler = subprocess.Popen([sys.executable, f"{REPO}/scripts/sampler.py",
+                                    f"{cdir}/resources.csv", "5"],
+                                   start_new_session=True, env=env)
+        phases = {}
+        try:
+            phases["bench_start"] = time.time()
+            bench = bench_cell(env_binpath(args), cell, args.repeats,
+                               pp_tokens, args.tg_tokens, cdir, env)
+            phases["bench_end"] = time.time()
+            log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
+            ttft, p0, p1 = probe_cell(env_binpath(args), cell, args.ctx, args.port,
+                                      cdir, args.repeats, args.tg_tokens, env)
+            phases["probe_start"], phases["probe_end"] = p0, p1
+            log(f"  probe: ttft={ttft['ttft_ms_mean']}ms gen={ttft['gen_tps_mean']} t/s")
+        finally:
+            phases["done"] = time.time()
+            killpg(sampler)
+        json.dump(phases, open(f"{cdir}/phases.json", "w"), indent=1)
+
+        rows = list(csv.DictReader(open(f"{cdir}/resources.csv")))
+        res = {
+            "bench_window": window_stats(rows, phases["bench_start"], phases["bench_end"]),
+            "probe_window": window_stats(rows, phases["probe_start"], phases["probe_end"]),
+            "cell_window": window_stats(rows, phases["bench_start"], phases["done"]),
+        }
+        tg_srv = ttft["gen_tps_mean"]
+        pw = (res["probe_window"] or {}).get("power_w_mean")
+        summary = {
+            "cell": cell["id"], "backend": args.backend, "run": run_id,
+            "model": cell["model"], "quant": cell["quant"], "arch": cell["arch"],
+            "size_gib": cell["size_gib"], "bench": bench, "ttft": ttft,
+            "resources": res,
+            "tok_per_w": round(tg_srv / pw, 2) if pw else None,
+        }
+        json.dump(summary, open(f"{cdir}/cell.json", "w"), indent=1)
+
+    consolidate()
+    # M8 (tracked, not yet implemented): PLAN §3 says every sweep is "git commit +
+    # tag run-YYYYMMDD-N" with llama.cpp commit + env fingerprint, and fixes the CPU
+    # governor. The driver does NOT do this yet. Until implemented, run manually after
+    # a sweep:
+    #   git add results/ && git commit -m "run: <id>" \
+    #     && git tag run-$(date +%Y%m%d)-$(n)
+    # and fix the governor (e.g. `cpupower frequency-set -g performance`).
+    log(f"done -> {rdir} (see results/table.md)")
+
+
+def env_binpath(args):
+    return BUILDS[args.backend]
+
+
+def consolidate():
+    """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
+    rows = []
+    for rj in sorted(glob.glob(f"{REPO}/results/run-*/**/run.json", recursive=True)):
+        rd_ = os.path.dirname(rj)
+        meta = json.load(open(rj))
+        for cj in sorted(glob.glob(f"{rd_}/*/cell.json")):
+            s = json.load(open(cj))
+            res = s["resources"]
+            base = {"run_id": s["run"], "backend": s["backend"], "cell": s["cell"],
+                    "model": s["model"], "quant": s["quant"], "size_gib": s["size_gib"]}
+            for test, stats in s["bench"].items():
+                rows.append({**base, "metric": f"{test}_bench_tps", "unit": "t/s",
+                             "value": stats["mean"],
+                             "note": f"llama-bench mean of {len(stats['repeats'])}"})
+            # M3: N is the actual request count (len of ttft.requests), not a literal.
+            nreq = len(s["ttft"].get("requests", []))
+            rows.append({**base, "metric": "tg_server_tps", "unit": "t/s",
+                         "value": s["ttft"]["gen_tps_mean"],
+                         "note": f"streaming, mean of {nreq}"})
+            rows.append({**base, "metric": "ttft_ms", "unit": "ms",
+                         "value": s["ttft"]["ttft_ms_mean"],
+                         "note": f"mean of {nreq}"})
+            for wname in ("probe_window", "bench_window"):
+                w = res.get(wname) or {}
+                if w:
+                    rows.append({**base, "metric": f"power_w_{wname[:5]}", "unit": "W",
+                                 "value": w["power_w_mean"], "note": f"max {w['power_w_max']}"})
+            cw = res.get("cell_window") or {}
+            if cw:
+                rows.append({**base, "metric": "temp_c_max", "unit": "C",
+                             "value": cw["temp_c_max"], "note": ""})
+                rows.append({**base, "metric": "vram_peak_gib", "unit": "GiB",
+                             "value": cw["vram_gib_max"], "note": ""})
+            if s.get("tok_per_w"):
+                rows.append({**base, "metric": "tok_per_w", "unit": "t/s/W",
+                             "value": s["tok_per_w"], "note": "server tg / probe W mean"})
+
+    path = f"{REPO}/results/consolidated.csv"
+    fields = ["run_id", "backend", "cell", "model", "quant", "size_gib",
+              "metric", "unit", "value", "note"]
+    # B3: rebuild the whole file ("w") — rows are already re-derived from ALL run
+    # dirs above. Append mode re-emitted every run's rows on each call, so a Vulkan
+    # pass followed by ROCm would double every Vulkan row.
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+
+    # render table.md (all runs)
+    md = ["# Results", "",
+          "> Sustained = llama-server streaming 512-token generations. "
+          "bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase.", ""]
+    runs = {}
+    for r in rows:
+        runs.setdefault((r["run_id"], r["backend"]), []).append(r)
+    for (rid, be), rs in sorted(runs.items()):
+        md.append(f"## {rid} — {be}")
+        md.append("")
+        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT ms | probe W | tok/s/W | VRAM peak GiB |")
+        md.append("|---|---|---|---|---|---|---|---|---|")
+        bycell = {}
+        for r in rs:
+            bycell.setdefault(r["cell"], {})[r["metric"]] = r["value"]
+        for cell, m in bycell.items():
+            quant = next(r["quant"] for r in rs if r["cell"] == cell)
+            md.append("| {c} | {q} | {p} | {b} | {s} | {t} | {w} | {e} | {v} |".format(
+                c=cell, q=quant,
+                p=m.get("pp2048_bench_tps", "–"), b=m.get("tg512_bench_tps", "–"),
+                s=m.get("tg_server_tps", "–"), t=m.get("ttft_ms", "–"),
+                w=m.get("power_w_probe", "–"), e=m.get("tok_per_w", "–"),
+                v=m.get("vram_peak_gib", "–")))
+        md.append("")
+    open(f"{REPO}/results/table.md", "w").write("\n".join(md))
+
+
+if __name__ == "__main__":
+    main()

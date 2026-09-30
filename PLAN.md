@@ -30,7 +30,7 @@ Full fingerprint: `docs/env.md`.
 ## 3. Methodology
 
 **Per cell (5 cells × 2 backends = 10 runs):**
-- `llama-bench` (matching build dir): `-p {512, 2048}` prompt processing, `-n 512` generation, `-r 3` repeats, `-ngl 99`, ctx 8192. Yields pp/tg tok/s + peak VRAM.
+- `llama-bench` (matching build dir): `-p {512, 2048}` prompt processing, `-n 512` generation, `-r 3` repeats, `-ngl 99`. Yields pp/tg tok/s + peak VRAM. **Context note (B1):** the pinned `llama-bench` (`5b59b83f4`) has **no `-c/--ctx` flag**, so bench runs at the model's default context (4096) — NOT 8192. `llama-server` (the TTFT/sustained probe) **does** take `-c` and runs at `--ctx` (8192). `run.json` records both `ctx_bench` and `ctx_server` so the data is never mislabeled.
 - TTFT + sustained tok/s: `llama-server` (OpenAI-compatible) + Python stdlib client — warmup request, then 3 timed 512-token generations, TTFT per request.
 - **Power**: 5 Hz sampler → `rocm-smi --showpower --showtemp` CSV; compute avg W and tok/s/W. Caveat documented: GPU-only power (no `amd-power-tune` for SoC level).
 - **Memory**: `mem_info_vram_used` polled by sampler (peak) + llama-bench peak report + system `free`.
@@ -44,7 +44,7 @@ Full fingerprint: `docs/env.md`.
 
 **Reproducibility:** one command per sweep:
 ```
-./scripts/run_sweep.sh --backend vulkan --matrix matrix.yaml
+python3 scripts/run_sweep.py --backend vulkan
 ```
 Driver: verify GPU idle → start power sampler → iterate cells (llama-bench + server TTFT probe) → write `results/run-YYYYMMDD-HHMM/` → consolidate `results/consolidated.csv` + `results/table.md`. Every sweep: git commit + tag `run-YYYYMMDD-N` with llama.cpp commit + env fingerprint.
 
@@ -54,7 +54,7 @@ Driver: verify GPU idle → start power sampler → iterate cells (llama-bench +
 |---|---|---|---|
 | **0. Scaffold + README** (½ h) | git init, layout, `.gitignore`, `docs/env.md`, README corrections (D1/D3), freeze `matrix.yaml` | 30 min | repo initialized, README corrected ✅ (this phase) |
 | **1. Verify backends** (1 h) | Smoke: `llama-simple` on smallest cell (Qwen3.8-27B Q5_K_XL) via **ROCm build** (Vulkan already proven by the running server); confirm rocm-smi power sampling; record idle baseline | 1 h | both backends load + generate a model |
-| **2. Harness v1 + smoke** (¼ d) | `scripts/run_sweep.sh`, power sampler, TTFT client, CSV/markdown renderers; 1 cell × both backends end-to-end | 3–4 h | one clean run producing valid CSV: tok/s, TTFT, peak VRAM, W |
+| **2. Harness v1 + smoke** (¼ d) | `scripts/run_sweep.py`, power sampler, TTFT client, CSV/markdown renderers; 1 cell × both backends end-to-end | 3–4 h | one clean run producing valid CSV: tok/s, TTFT, peak VRAM, W |
 | **3. Full Vulkan sweep** (evening) | 5 cells, backend A — **needs :11436 server stopped first** | 2–3 h | complete `results/run-*` (Vulkan) |
 | **4. Full ROCm sweep** (evening) | 5 cells, backend B; gfx1151 instability → `HSA_OVERRIDE_GFX_VERSION=11.5.0` retry, else demote ROCm to bonus axis | 2–3 h | Vulkan-vs-ROCm comparison table |
 | **5. Quality evals** (1 d, parallel track) | Build EN/FI eval set + scoring scripts; run all 5 models. (Embeddings deferred.) | 1 d | quality table per model × category |
@@ -75,7 +75,7 @@ Critical path: 0 → 1 → 2 → 3/4 (overnights, after stopping :11436) → 6. 
 
 ## 6. Deliverable mapping (README checkboxes)
 
-- [ ] Benchmark script, one-command run → Phases 2–4 (`scripts/run_sweep.sh`)
+- [ ] Benchmark script, one-command run → Phases 2–4 (`scripts/run_sweep.py`)
 - [ ] Vulkan vs ROCm comparison → Phase 4
 - [ ] Results table CSV + markdown, repo others can run → Phases 2–4 (+ `docs/RUNNING.md`)
 - [ ] Post: hardware + numbers → Phase 6

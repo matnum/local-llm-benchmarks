@@ -1,0 +1,3 @@
+# Dependency for scripts/run_sweep.py (matrix.yaml parser).
+# The other scripts (sampler.py, ttft_probe.py) are stdlib-only.
+PyYAML>=6.0

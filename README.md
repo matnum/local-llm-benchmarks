@@ -17,6 +17,7 @@ AMD Ryzen AI Max+ 395 (Strix Halo): 16C/32T, Radeon 8060S iGPU (RDNA 3.5, 40 CUs
 - **Backend A (reference): Vulkan** — `~/.local/opt/llama.cpp/build-vulkan` (Mesa 26.2.3 RADV, `RADV STRIX_HALO`), `-ngl 99`, 16 physical threads.
 - **Backend B: ROCm 7.2.4** — `~/.local/opt/llama.cpp/build` (HIP, ROCm-WMMA flash-attention, graphs on, VMM off). `rocminfo` sees **gfx1151 natively** — no `HSA_OVERRIDE_GFX_VERSION` needed; kept as a fallback if an op misbehaves.
 - Ollama/LM Studio: for a later "deployment experience" comparison, not the benchmark path.
+- **Benchmark driver** (`scripts/run_sweep.py`): stdlib + **PyYAML** only (`requirements.txt`). The `sampler.py`/`ttft_probe.py` helpers are stdlib-only. Run with a python that has PyYAML (system `/usr/bin/python3` has it): `python3 scripts/run_sweep.py --backend {vulkan,rocm}`.
 
 ## Benchmark matrix (GGUF — on-disk models only, per decision D1)
 | Tier | Model | Quant | File size | Notes |

@@ -22,8 +22,12 @@ Verified 2026-09-30 on the target machine (this box is the hardware under test).
 | Tools | git 2.55, cmake, gcc/g++, clang, hipcc/amdclang, vulkaninfo, rocm-smi |
 
 ## Power measurement
-- `rocm-smi --showpower` → socket graphics package power (verified working, e.g. 54.6 W at 58% busy).
-- Sampler polls at 5 Hz to CSV during each cell.
+- **Source of truth during a run:** `scripts/sampler.py` reads the amdgpu **hwmon via sysfs**
+  (resolved by name, not a hardcoded index) at 5 Hz to CSV per cell — `power1_average`
+  (microwatts → W) and `temp1_input` (millidegrees → °C). No `rocm-smi` CLI per sample (fast).
+- **Cross-check:** `rocm-smi --showpower --showtemp` → socket graphics package power
+  (verified working, e.g. 54.6 W at 58% busy). Sample one cell against it to confirm the
+  hwmon units line up.
 - Caveat: GPU-only power. Under CPU-heavy load (prompt processing) SoC power is higher;
   `amd-power-tune` (platform level) not installed — revisit if tok/s/W needs the full picture.
 

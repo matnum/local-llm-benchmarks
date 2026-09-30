@@ -54,12 +54,37 @@ Small, version-controlled, ~50–100 items:
 - FI: Finnish summarization, Finnish extraction (invoice fields), FI grammar/translation, FI chat Q&A
 - Embeddings: **bge-m3** (FI-supported) vs nomic-embed-text (EN-centric) on a Finnish retrieval set — this decides the Finnish RAG stack. **Deferred: needs model downloads** (no-download constraint / no HF token at the moment).
 
+## How to run
+See **[docs/RUNNING.md](docs/RUNNING.md)** for the operator guide (stop the dev server,
+commands, per-cell behavior, results layout, caveats). Short version:
+
+```
+/usr/bin/python3 scripts/run_sweep.py --backend {vulkan,rocm}          # full 5-cell sweep
+/usr/bin/python3 scripts/run_sweep.py --backend rocm --cells qwen3.8-27b-q5_k_xl   # smoke
+```
+
+## Where things live
+| Path | What |
+|---|---|
+| `scripts/run_sweep.py` | one-command sweep driver (stdlib + PyYAML) |
+| `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib-only helpers (power/trace, TTFT probe) |
+| `matrix.yaml` | frozen on-disk benchmark matrix (D1) |
+| `docs/RUNNING.md` | operator guide — commands, results, caveats |
+| `docs/env.md` | verified machine fingerprint + power/contention notes |
+| `PLAN.md` | locked decisions D1–D4, methodology, phases, risks |
+| `REVIEW.md` | independent review of the harness (B/I/M issues) |
+| `results/consolidated.csv`, `results/table.md` | tracked rollups (raw `results/run-*/` is gitignored) |
+
 ## Deliverables
-- [ ] Benchmark script (llama.cpp CLI or Python bindings), one-command run
-- [ ] Vulkan vs ROCm backend comparison
-- [ ] Results table (CSV + rendered markdown) + repo others can run
+- [x] Benchmark script, one-command run → `scripts/run_sweep.py` (built; clean run pending)
+- [ ] Vulkan vs ROCm backend comparison → needs a real sweep (Phase 3/4)
+- [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (populated once a run lands)
 - [ ] Post: hardware + numbers (evergreen "own hardware" content asset)
 - [ ] Headline post candidate: "A 120B-class model on a 128 GB APU — what actually runs"
 
 ## Status
-In progress — plan in [PLAN.md](PLAN.md). Toolchain, builds, and all five matrix models are already provisioned on this box (2026-09-30); the benchmark harness is the next step.
+In progress — plan in [PLAN.md](PLAN.md). Toolchain, builds, and all five matrix models are
+provisioned (2026-09-30). The harness is **implemented, reviewed, and its blocking/important
+issues fixed** on branch `fix/harness-b1-b3-i1-i4` (see [REVIEW.md](REVIEW.md)); the next
+step is a **clean one-cell smoke run** (the parser + SSE probe are still unexercised against
+the pinned build), then the full Vulkan/ROCm sweeps.

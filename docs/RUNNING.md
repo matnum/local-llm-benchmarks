@@ -4,12 +4,17 @@ Operator guide for `scripts/run_sweep.py` — the one-command sweep driver.
 Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLAN.md)
 (locked decisions + methodology + phases), [env.md](env.md) (verified machine fingerprint).
 
-> **Current state (2026-09-30):** the harness is implemented, independently reviewed
+> **Current state (2026-10-02):** the harness is implemented, independently reviewed
 > ([REVIEW.md](../REVIEW.md)), and the blocking/important fixes (B1–B3, I1–I4) are
-> committed on branch `fix/harness-b1-b3-i1-i4`. A **clean end-to-end smoke run has not
-> yet been captured** — the first real smoke is what exercises the `llama-bench` table
-> parser and the SSE probe against this pinned build. Until then, treat every number in
-> `results/` as unverified.
+> committed on branch `fix/harness-b1-b3-i1-i4`. A **clean end-to-end cell has landed**:
+> `run-20261002-1719` (rocm, `qwen3.8-27b-q5_k_xl`) exercised the `llama-bench` table
+> parser, the SSE probe and the power sampler against the pinned build — see
+> `results/table.md`. Only 1 of 5 cells and 1 of 2 backends exist so far; the full Vulkan
+> and ROCm sweeps are still to run.
+>
+> Runs predating 2026-10-02 have invalid server-side numbers: `run-20260930-2239` measured
+> `gen_tps` with the clock bug described in §7 and is kept as
+> `results/superseded-pre-fix-20260930-2239/` (excluded from the rollup).
 
 ---
 
@@ -57,6 +62,10 @@ cd /home/halo/projects/local-llm-benchmarks
 
 # Smoke — the single smallest cell (19.4 GiB), ~5–10 min:
 /usr/bin/python3 scripts/run_sweep.py --backend rocm --cells qwen3.8-27b-q5_k_xl
+
+# Roll up whatever exists, without touching the GPU (use after a partial/aborted
+# sweep — before this flag existed, an interrupted sweep produced no table at all):
+/usr/bin/python3 scripts/run_sweep.py --consolidate
 ```
 
 Options (from `--help`):
@@ -72,6 +81,7 @@ Options (from `--help`):
 | `--ctx N` | `8192` | server context size (see caveat in §7) |
 | `--force` | off | skip the idle gate (results flagged contaminated) |
 | `--rocm-override` | off | set `HSA_OVERRIDE_GFX_VERSION=11.5.0` (gfx1151 fallback, see §7) |
+| `--consolidate` | off | rebuild `consolidated.csv` + `table.md` from existing run dirs and exit; no GPU, no `--backend` needed |
 
 ## 4. What the driver does per cell
 
@@ -84,14 +94,24 @@ Options (from `--help`):
 5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk q8_0 -ctv
    q8_0 -np 1 --alias <cell>`), waits on `/health` (timeout scales with model size:
    `900 + size_gib*15` s), then runs `ttft_probe.py`: 1 untimed warmup request, then `N`
-   timed **streaming** 512-token completions (temperature 0) → `ttft.json`. TTFT = time to
-   first streamed token; gen_tps = tokens / (last − first).
+   timed **streaming** 512-token completions (temperature 0, **`ignore_eos: true`**) →
+   `ttft.json`. TTFT = time to first streamed token; gen_tps = tokens / (t_end − t_first),
+   both absolute clock readings. `ignore_eos` matters: without it a model that ends its
+   turn on a raw completion prompt (Qwen3.8 does) returns one empty chunk and the probe
+   cannot measure anything. Each request also records `finish_reason`,
+   `tokens_requested` and `complete_decodes`, so a partial decode is visible in the JSON
+   instead of being averaged in silently.
 6. **Aggregate** — kills server + sampler, slices `resources.csv` into bench / probe / cell
    windows, writes `cell.json` (includes `tok_per_w = server tg ÷ probe-window mean W`).
 
+Every `log()` line is also written to `<run>/<backend>/sweep.log`, together with `argv`, the
+harness commit and any crash traceback — so an interrupted sweep explains itself instead of
+leaving a `run.json` that merely lists cells with no artifacts.
+
 After all cells: **rebuild** `results/consolidated.csv` and `results/table.md` from *every*
 `run-*` directory (full rewrite, not append — so a Vulkan pass then a ROCm pass does not
-duplicate rows).
+duplicate rows). The same rebuild is available standalone via `--consolidate`, for when a
+sweep is aborted or only some cells were selected.
 
 ## 5. Where results land
 
@@ -99,7 +119,8 @@ duplicate rows).
 results/
   run-YYYYMMDD-HHMM/
     <backend>/                      # vulkan | rocm
-      run.json                      # run metadata: llama.cpp commit, cells, ctx_bench/ctx_server, forced
+      run.json                      # run metadata: llama.cpp + harness commit, cells, ctx_bench/ctx_server, forced
+      sweep.log                     # driver stdout + crash traceback (why an interrupted run stopped)
       <cell_id>/
         bench.log                   # raw llama-bench stdout+stderr
         server.log                  # raw llama-server stdout

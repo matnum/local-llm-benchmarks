@@ -106,7 +106,7 @@ commands, per-cell behavior, results layout, caveats). Short version:
 ## Deliverables
 - [x] Benchmark script, one-command run → `scripts/run_sweep.py` (built; clean run pending)
 - [x] Vulkan vs ROCm backend comparison → both 5-cell sweeps done 2026-10-02 (runs `run-20261002-1734` / `run-20261002-1751`); Vulkan takes generation, ROCm takes prefill
-- [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (populated for the one cell that has run)
+- [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (11 cells: 5 × both backends, plus a repeat rocm cell)
 - [ ] Post: hardware + numbers (evergreen "own hardware" content asset)
 - [ ] Headline post candidate: "A 120B-class model on a 128 GB APU — what actually runs"
 

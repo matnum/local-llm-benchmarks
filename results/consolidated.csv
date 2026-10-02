@@ -1,0 +1,11 @@
+run_id,backend,cell,model,quant,size_gib,metric,unit,value,note
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp512_bench_tps,t/s,352.78,"llama-bench mean of 3, sd ±5.38"
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp2048_bench_tps,t/s,341.05,"llama-bench mean of 3, sd ±1.4"
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.36,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.23,"streaming, mean of 3"
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,145.3,mean of 3
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,85.1,max 99.8
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,84.9,max 118.9
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,80.0,
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,19.65,
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.12,server tg / probe W mean

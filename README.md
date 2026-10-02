@@ -74,17 +74,25 @@ commands, per-cell behavior, results layout, caveats). Short version:
 | `PLAN.md` | locked decisions D1–D4, methodology, phases, risks |
 | `REVIEW.md` | independent review of the harness (B/I/M issues) |
 | `results/consolidated.csv`, `results/table.md` | tracked rollups (raw `results/run-*/` is gitignored) |
+| `results/superseded-pre-fix-20260930-2239/` | kept for reference, gitignored: measured server-side numbers predate the probe fix |
 
 ## Deliverables
 - [x] Benchmark script, one-command run → `scripts/run_sweep.py` (built; clean run pending)
 - [ ] Vulkan vs ROCm backend comparison → needs a real sweep (Phase 3/4)
-- [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (populated once a run lands)
+- [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (populated for the one cell that has run)
 - [ ] Post: hardware + numbers (evergreen "own hardware" content asset)
 - [ ] Headline post candidate: "A 120B-class model on a 128 GB APU — what actually runs"
 
 ## Status
 In progress — plan in [PLAN.md](PLAN.md). Toolchain, builds, and all five matrix models are
 provisioned (2026-09-30). The harness is **implemented, reviewed, and its blocking/important
-issues fixed** on branch `fix/harness-b1-b3-i1-i4` (see [REVIEW.md](REVIEW.md)); the next
-step is a **clean one-cell smoke run** (the parser + SSE probe are still unexercised against
-the pinned build), then the full Vulkan/ROCm sweeps.
+issues fixed** on branch `fix/harness-b1-b3-i1-i4` (see [REVIEW.md](REVIEW.md)).
+
+A **first clean end-to-end cell landed 2026-10-02** (`run-20261002-1719`, rocm,
+`qwen3.8-27b-q5_k_xl` — see [results/table.md](results/table.md)); it exercised the
+`llama-bench` table parser, the SSE probe and the power sampler against the pinned build.
+Getting there exposed two further defects, both fixed: the probe's `gen_tps` divided by a
+duration-minus-absolute-clock (reporting ~0.01 t/s for every model and silently zeroing
+`tok_per_w`), and it did not set `ignore_eos`, so a model that ends its turn on a raw
+completion prompt returned no text at all. Remaining: the full sweeps — 4 of 5 cells unrun,
+and no ROCm/Vulkan comparison yet.

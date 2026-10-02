@@ -4,8 +4,119 @@ run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.36,"llama-bench mean of 3, sd ±0.0"
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.23,"streaming, mean of 3"
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,145.3,mean of 3
+run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms_p50,ms,137.9,median of 3; compare with ttft_ms to gauge request-to-request spread
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,85.1,max 99.8
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,84.9,max 118.9
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,80.0,
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,19.65,
 run-20261002-1719,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp512_bench_tps,t/s,831.84,"llama-bench mean of 3, sd ±2.1"
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp2048_bench_tps,t/s,780.42,"llama-bench mean of 3, sd ±34.49"
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg512_bench_tps,t/s,55.12,"llama-bench mean of 3, sd ±0.2"
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg_server_tps,t/s,53.18,"streaming, mean of 3"
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms,ms,124.0,mean of 3
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms_p50,ms,143.9,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_probe,W,85.6,max 91.8
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_bench,W,61.3,max 117.1
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,temp_c_max,C,72.0,
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,vram_peak_gib,GiB,59.09,
+run-20261002-1734,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tok_per_w,t/s/W,0.62,server tg / probe W mean
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp512_bench_tps,t/s,1238.19,"llama-bench mean of 3, sd ±11.86"
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp2048_bench_tps,t/s,1140.09,"llama-bench mean of 3, sd ±48.16"
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg512_bench_tps,t/s,74.75,"llama-bench mean of 3, sd ±0.54"
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg_server_tps,t/s,71.46,"streaming, mean of 3"
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms,ms,114.8,mean of 3
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms_p50,ms,162.8,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_probe,W,80.7,max 86.3
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_bench,W,68.5,max 117.6
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,temp_c_max,C,77.0,
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,vram_peak_gib,GiB,23.76,
+run-20261002-1734,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tok_per_w,t/s/W,0.89,server tg / probe W mean
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp512_bench_tps,t/s,1166.35,"llama-bench mean of 3, sd ±9.61"
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp2048_bench_tps,t/s,1117.97,"llama-bench mean of 3, sd ±29.8"
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg512_bench_tps,t/s,61.77,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg_server_tps,t/s,60.26,"streaming, mean of 3"
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms,ms,576.3,mean of 3
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms_p50,ms,688.5,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_probe,W,75.3,max 82.6
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_bench,W,65.9,max 115.6
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,temp_c_max,C,75.0,
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,vram_peak_gib,GiB,27.1,
+run-20261002-1734,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tok_per_w,t/s/W,0.8,server tg / probe W mean
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp512_bench_tps,t/s,351.35,"llama-bench mean of 3, sd ±14.44"
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp2048_bench_tps,t/s,328.65,"llama-bench mean of 3, sd ±0.13"
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.6,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.52,"streaming, mean of 3"
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,1350.9,mean of 3
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms_p50,ms,1631.9,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,84.1,max 92.8
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,84.4,max 117.8
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,82.0,
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,19.06,
+run-20261002-1734,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.13,server tg / probe W mean
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp512_bench_tps,t/s,340.74,"llama-bench mean of 3, sd ±14.87"
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp2048_bench_tps,t/s,317.69,"llama-bench mean of 3, sd ±0.05"
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg512_bench_tps,t/s,10.01,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg_server_tps,t/s,9.96,"streaming, mean of 3"
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms,ms,1087.7,mean of 3
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms_p50,ms,809.1,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_probe,W,84.5,max 97.9
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_bench,W,82.0,max 118.7
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,temp_c_max,C,85.0,
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,vram_peak_gib,GiB,20.09,
+run-20261002-1734,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp512_bench_tps,t/s,927.78,"llama-bench mean of 3, sd ±30.85"
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp2048_bench_tps,t/s,906.9,"llama-bench mean of 3, sd ±31.94"
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg512_bench_tps,t/s,51.46,"llama-bench mean of 3, sd ±0.01"
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg_server_tps,t/s,49.59,"streaming, mean of 3"
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms,ms,68.1,mean of 3
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms_p50,ms,67.2,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_probe,W,86.1,max 94.7
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_bench,W,62.5,max 118.3
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,temp_c_max,C,84.0,
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,vram_peak_gib,GiB,59.36,
+run-20261002-1751,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tok_per_w,t/s/W,0.58,server tg / probe W mean
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp512_bench_tps,t/s,1344.52,"llama-bench mean of 3, sd ±29.78"
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp2048_bench_tps,t/s,1288.43,"llama-bench mean of 3, sd ±32.64"
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg512_bench_tps,t/s,63.2,"llama-bench mean of 3, sd ±0.29"
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg_server_tps,t/s,58.59,"streaming, mean of 3"
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms,ms,24.7,mean of 3
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms_p50,ms,22.5,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_probe,W,86.5,max 104.5
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_bench,W,72.5,max 116.9
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,temp_c_max,C,84.0,
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,vram_peak_gib,GiB,24.12,
+run-20261002-1751,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tok_per_w,t/s/W,0.68,server tg / probe W mean
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp512_bench_tps,t/s,1169.31,"llama-bench mean of 3, sd ±27.83"
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp2048_bench_tps,t/s,1140.08,"llama-bench mean of 3, sd ±19.14"
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg512_bench_tps,t/s,52.82,"llama-bench mean of 3, sd ±0.03"
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg_server_tps,t/s,50.8,"streaming, mean of 3"
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms,ms,57.9,mean of 3
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms_p50,ms,58.1,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_probe,W,85.5,max 96.0
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_bench,W,71.5,max 115.9
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,temp_c_max,C,83.0,
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,vram_peak_gib,GiB,27.46,
+run-20261002-1751,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tok_per_w,t/s/W,0.59,server tg / probe W mean
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp512_bench_tps,t/s,347.43,"llama-bench mean of 3, sd ±6.6"
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp2048_bench_tps,t/s,339.18,"llama-bench mean of 3, sd ±1.4"
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.35,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.23,"streaming, mean of 3"
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,155.9,mean of 3
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms_p50,ms,137.3,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,85.2,max 101.0
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,84.6,max 117.8
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,85.0,
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,19.65,
+run-20261002-1751,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp512_bench_tps,t/s,345.31,"llama-bench mean of 3, sd ±4.63"
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp2048_bench_tps,t/s,336.27,"llama-bench mean of 3, sd ±1.24"
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg512_bench_tps,t/s,9.84,"llama-bench mean of 3, sd ±0.0"
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg_server_tps,t/s,9.73,"streaming, mean of 3"
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms,ms,155.7,mean of 3
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms_p50,ms,150.0,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_probe,W,85.4,max 114.3
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_bench,W,82.5,max 118.3
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,temp_c_max,C,88.0,
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,vram_peak_gib,GiB,20.59,
+run-20261002-1751,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tok_per_w,t/s/W,0.11,server tg / probe W mean

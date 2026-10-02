@@ -445,6 +445,15 @@ def consolidate():
             rows.append({**base, "metric": "ttft_ms", "unit": "ms",
                          "value": s["ttft"]["ttft_ms_mean"],
                          "note": f"mean of {nreq}"})
+            # Mean alone misleads when the per-request spread is wide: on Vulkan
+            # the first timed request hits the prefill prediction and requests
+            # 2-3 take 2-12x longer to first token, while ROCm runs flat. Ship the
+            # median alongside it so the difference is visible in the rollup.
+            if s["ttft"].get("ttft_ms_p50") is not None:
+                rows.append({**base, "metric": "ttft_ms_p50", "unit": "ms",
+                             "value": s["ttft"]["ttft_ms_p50"],
+                             "note": f"median of {nreq}; compare with ttft_ms to "
+                                     "gauge request-to-request spread"})
             for wname in ("probe_window", "bench_window"):
                 w = res.get(wname) or {}
                 if w:

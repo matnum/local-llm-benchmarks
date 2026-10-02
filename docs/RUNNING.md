@@ -119,7 +119,7 @@ sweep is aborted or only some cells were selected.
 results/
   run-YYYYMMDD-HHMM/
     <backend>/                      # vulkan | rocm
-      run.json                      # run metadata: llama.cpp + harness commit, cells, ctx_bench/ctx_server, forced
+      run.json                      # run metadata: llama.cpp + harness commit, cpu_power, cells, ctx_bench/ctx_server, forced
       sweep.log                     # driver stdout + crash traceback (why an interrupted run stopped)
       <cell_id>/
         bench.log                   # raw llama-bench stdout+stderr
@@ -150,6 +150,12 @@ records `forced: true`).
 
 ## 7. Caveats (read before trusting a number)
 
+- **CPU power state is a measurement condition, and it is deliberately not pinned.** This box
+  runs `amd_pstate=active` with governor `powersave`, EPP `balance_performance` and no power
+  daemon (decision 2026-10-02: leave the default, record it — see
+  [env.md](env.md#cpu-power-state-measurement-condition)). `run.json.cpu_power` stamps what
+  each run measured under, so a run taken after a profile change is spotted rather than
+  silently averaged in with the rest.
 - **Two different contexts, recorded separately.** The pinned `llama-bench`
   (`5b59b83f4`) has **no `-c/--ctx` flag**, so bench tok/s are measured at the
   **model-default context (4096)** — *not* at `--ctx`. `llama-server` *does* take `-c` and

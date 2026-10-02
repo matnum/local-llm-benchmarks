@@ -89,6 +89,31 @@ def rd(path, default=0):
         return default
 
 
+def read_text(path, default="unknown"):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except Exception:
+        return default
+
+
+def cpu_power_state():
+    """The CPU power state a run was measured under.
+
+    A measurement condition, not a detail: this box runs amd_pstate=active with
+    governor=powersave and a firmware-chosen EPP, and nothing pins them. Decision
+    2026-10-02 was to leave the default state rather than force `performance`, so
+    each run has to state what it measured under — otherwise a sweep taken after
+    a power-profile change is silently incomparable with one taken before.
+    """
+    return {
+        "governor": read_text("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"),
+        "epp": read_text("/sys/devices/system/cpu/cpu0/cpufreq/"
+                         "energy_performance_preference"),
+        "pstate_driver": read_text("/sys/devices/system/cpu/amd_pstate/status"),
+    }
+
+
 def gpu_idle():
     busy = rd("/sys/class/drm/card0/device/gpu_busy_percent")
     vram = rd("/sys/class/drm/card0/device/mem_info_vram_used") / GIB
@@ -260,6 +285,7 @@ def main():
     # args.ctx. Record both so the data is never silently mislabeled.
     meta = {"run_id": run_id, "ts": time.time(), "backend": args.backend,
             "llama_cpp_commit": commit, "harness_commit": harness_commit,
+            "cpu_power": cpu_power_state(),
             "cells": [c["id"] for c in cells],
             "repeats": args.repeats, "tg_tokens": args.tg_tokens,
             "pp_tokens": pp_tokens,
@@ -274,6 +300,9 @@ def main():
     log(f"harness {harness_commit[:12]} | llama.cpp {commit[:12]} | "
         f"backend {args.backend} | cells {[c['id'] for c in cells]} "
         f"(bench ctx = model default; server ctx = {args.ctx})")
+    ps = meta["cpu_power"]
+    log(f"cpu: governor={ps['governor']} epp={ps['epp']} "
+        f"pstate={ps['pstate_driver']}")
 
     def check_idle(tag):
         """Idle gate (I3): GPU must be idle before each cell, not just once.

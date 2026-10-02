@@ -46,7 +46,7 @@ Machine-readable version: `matrix.yaml`. Models live in `~/.local/share/models/`
 - Generation tok/s (sustained, 512-token outputs), prompt-processing tok/s
 - TTFT (time to first token), peak iGPU + system memory
 - **Power draw (W) and tok/s per watt** — the APU differentiator for the content (desktop vs. this box at idle/load)
-- Reproducibility: fixed prompts, fixed context lengths, N repeats, git-tagged script + results CSV
+- Reproducibility: fixed prompts, fixed context lengths, N repeats, git-tagged script + results CSV, and the measured CPU power state (governor/EPP) stamped into `run.json`
 
 ## Fixed eval set (quality axis)
 Small, version-controlled, ~50–100 items:

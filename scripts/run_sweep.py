@@ -49,6 +49,7 @@ BUILDS = {"vulkan": f"{LLAMA_CPP}/build-vulkan/bin", "rocm": f"{LLAMA_CPP}/build
 GIB = 1024 ** 3
 IDLE_BUSY_PCT = 5
 IDLE_VRAM_GIB = 4.0
+IDLE_SETTLE_S = 90      # how long to let the GPU settle before declaring it busy
 
 
 LOG_F = None
@@ -118,6 +119,32 @@ def gpu_idle():
     busy = rd("/sys/class/drm/card0/device/gpu_busy_percent")
     vram = rd("/sys/class/drm/card0/device/mem_info_vram_used") / GIB
     return busy < IDLE_BUSY_PCT and vram < IDLE_VRAM_GIB, busy, vram
+
+
+def wait_idle(tag, timeout=IDLE_SETTLE_S, poll_s=2.0):
+    """Poll until the GPU is idle; return (ok, busy, vram).
+
+    A single instantaneous read is not enough. Tearing down a large model leaves
+    gpu_busy near 95% for several seconds *after* VRAM has been released — the
+    teardown is itself GPU work and the busy counter lags it. Judging on the
+    instant right after `probe_cell` kills a 59 GiB server hard-failed the next
+    cell of a sweep (run-20261002-1731 died between cells 1 and 2 with
+    busy=93%, vram=0.1 GiB). Waiting for a settled GPU keeps the contamination
+    guarantee — it never proceeds while the GPU is busy — without mistaking a
+    cell's own teardown for foreign load.
+    """
+    t0 = time.time()
+    while True:
+        ok, busy, vram = gpu_idle()
+        if ok:
+            waited = time.time() - t0
+            if waited >= poll_s:
+                log(f"[{tag}] GPU settled after {waited:.1f}s "
+                    f"(busy={busy}%, vram={vram:.1f} GiB)")
+            return True, busy, vram
+        if time.time() - t0 >= timeout:
+            return False, busy, vram
+        time.sleep(poll_s)
 
 
 def killpg(proc):
@@ -307,14 +334,16 @@ def main():
     def check_idle(tag):
         """Idle gate (I3): GPU must be idle before each cell, not just once.
 
+        Waits for the GPU to *settle* (see wait_idle) rather than sampling once.
         Returns True to proceed; False means hard-fail (caller exits). --force
         downgrades to a contamination warning rather than a stop.
         """
-        ok, busy, vram = gpu_idle()
+        ok, busy, vram = wait_idle(tag)
         if not ok:
             if not args.force:
-                log(f"[{tag}] GPU NOT idle (busy={busy}%, vram={vram:.1f} GiB) — "
-                    "stop the dev llama-server (:11436) and rerun, or pass --force")
+                log(f"[{tag}] GPU NOT idle after {IDLE_SETTLE_S}s "
+                    f"(busy={busy}%, vram={vram:.1f} GiB) — stop the dev "
+                    "llama-server (:11436) and rerun, or pass --force")
                 return False
             log(f"[{tag}] GPU not idle (busy={busy}%, vram={vram:.1f} GiB) but --force: "
                 "continuing, this cell's results are CONTAMINATED")

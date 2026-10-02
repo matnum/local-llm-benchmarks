@@ -46,8 +46,12 @@ awk '{printf "busy: %s%%\n", $1}' /sys/class/drm/card0/device/gpu_busy_percent
 
 The driver's idle gate requires **busy < 5% and VRAM < 4 GiB**. It is checked **at sweep
 start and again before every cell** (a 10-cell sweep spans hours; a background process that
-starts mid-sweep must not silently contaminate later cells). If the GPU is not idle the
-driver **hard-fails (exit 2)** — unless you pass `--force`, which downgrades the failure to
+starts mid-sweep must not silently contaminate later cells). The check **polls for up to 90 s
+until the GPU settles** rather than sampling once: tearing down a large model leaves
+`gpu_busy` near 95% for several seconds after VRAM has already been released (the teardown is
+itself GPU work and the counter lags it) — sampling once hard-failed the cell following a
+59 GiB cell in `run-20261002-1731`. If the GPU still is not idle the driver
+**hard-fails (exit 2)** — unless you pass `--force`, which downgrades the failure to
 a "CONTAMINATED" warning and stamps `forced: true` into `run.json` (that's how the
 `run-20260930-1851-SMOKE-FAILED` run came to exist — do not run a real sweep with `--force`).
 

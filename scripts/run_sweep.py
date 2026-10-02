@@ -483,24 +483,26 @@ def consolidate():
     # render table.md (all runs)
     md = ["# Results", "",
           "> Sustained = llama-server streaming 512-token generations. "
-          "bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase.", ""]
+          "bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. "
+          "TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.", ""]
     runs = {}
     for r in rows:
         runs.setdefault((r["run_id"], r["backend"]), []).append(r)
     for (rid, be), rs in sorted(runs.items()):
         md.append(f"## {rid} — {be}")
         md.append("")
-        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT ms | probe W | tok/s/W | VRAM peak GiB |")
-        md.append("|---|---|---|---|---|---|---|---|---|")
+        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |")
+        md.append("|---|---|---|---|---|---|---|---|---|---|")
         bycell = {}
         for r in rs:
             bycell.setdefault(r["cell"], {})[r["metric"]] = r["value"]
         for cell, m in bycell.items():
             quant = next(r["quant"] for r in rs if r["cell"] == cell)
-            md.append("| {c} | {q} | {p} | {b} | {s} | {t} | {w} | {e} | {v} |".format(
+            md.append("| {c} | {q} | {p} | {b} | {s} | {t} | {t50} | {w} | {e} | {v} |".format(
                 c=cell, q=quant,
                 p=m.get("pp2048_bench_tps", "–"), b=m.get("tg512_bench_tps", "–"),
                 s=m.get("tg_server_tps", "–"), t=m.get("ttft_ms", "–"),
+                t50=m.get("ttft_ms_p50", "–"),
                 w=m.get("power_w_probe", "–"), e=m.get("tok_per_w", "–"),
                 v=m.get("vram_peak_gib", "–")))
         md.append("")

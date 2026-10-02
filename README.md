@@ -74,11 +74,12 @@ gaps. Full per-cell metrics incl. power and temperature: [results/table.md](resu
 | qwen3.8-27b-q6_k | Q6_K | vulkan | 317.69 | 10.01 | 9.96 | 809.1 | 0.12 | 20.09 |
 | qwen3.8-27b-q6_k | Q6_K | rocm | 336.27 | 9.84 | 9.73 | 150.0 | 0.11 | 20.59 |
 
-**Vulkan takes generation, ROCm takes prompt processing — 5–0 each way.** ROCm is
--15.5% to -1.7% on `tg512` (so Vulkan is faster on every dense and MoE cell), while ROCm is
-+2.0% to +16.2% on `pp2048` prefill. ROCm also runs the package hotter (up to 88 C vs 85 C).
-Read `docs/RUNNING.md` §7 before quoting a TTFT figure: on Vulkan the first timed request is
-much faster than the next two, so the mean alone is misleading (this table uses the median).
+**Vulkan takes generation, ROCm takes prompt processing — 5–0 each way.** Vulkan is faster on
+`tg512` for every dense and MoE cell (ROCm trails by 1.7–15.5%), while ROCm is faster on
+`pp2048` prefill on every cell (by 2.0–16.2%). ROCm also runs the package hotter (up to 88 C
+vs 85 C). Before quoting a TTFT figure read `docs/RUNNING.md` §7: on Vulkan the first timed
+request is much faster than the next two, so the mean alone is misleading — that is why this
+table shows the median and `table.md` prints both.
 
 ## How to run
 See **[docs/RUNNING.md](docs/RUNNING.md)** for the operator guide (stop the dev server,

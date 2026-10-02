@@ -147,8 +147,9 @@ records `forced: true`).
 - **`consolidated.csv`** — one row per (run, cell, metric). Columns:
   `run_id, backend, cell, model, quant, size_gib, metric, unit, value, note`.
   `metric` values: `pp512_bench_tps`, `pp2048_bench_tps`, `tg512_bench_tps` (llama-bench
-  means), `tg_server_tps`, `ttft_ms` (streaming, from the probe), `power_w_probe` /
-  `power_w_bench` (W means in each window), `temp_c_max`, `vram_peak_gib`, `tok_per_w`.
+  means), `tg_server_tps`, `ttft_ms` / `ttft_ms_p50` (streaming, from the probe),
+  `power_w_probe` / `power_w_bench` (W means in each window), `temp_c_max`, `vram_peak_gib`,
+  `tok_per_w`.
   The `note` carries the actual repeat/request count (e.g. "streaming, mean of 3").
 - **`table.md`** — one table per (run, backend); the headline comparison view.
 
@@ -172,6 +173,15 @@ records `forced: true`).
   therefore **understates** the energy cost of prompt processing.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
+- **TTFT has a wide per-request spread on Vulkan — read the median, not just the mean.** With
+  an identical prompt repeated three times, Vulkan's first timed request lands near the
+  prefill prediction and requests 2-3 take 2–12x longer to first token, while ROCm runs flat
+  (measured 2026-10-02; e.g. `qwen3.8-27b-q5_k_xl`, prefill prediction ≈ 134 ms — Vulkan
+  `[787, 1632, 1634]` ms, ROCm `[137, 196, 135]` ms). Generation rate is unaffected
+  (`gen_tps` is identical across the three requests). `consolidated.csv` carries both
+  `ttft_ms` (mean) and `ttft_ms_p50` (median) for this reason; the per-request values are in
+  `ttft.json`. Root cause not yet investigated — that is a Vulkan-side question, not a
+  harness one.
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets
   `HSA_OVERRIDE_GFX_VERSION=11.5.0`); if it still fails, treat ROCm as a bonus axis per PLAN.

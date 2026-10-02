@@ -54,6 +54,32 @@ Small, version-controlled, ~50–100 items:
 - FI: Finnish summarization, Finnish extraction (invoice fields), FI grammar/translation, FI chat Q&A
 - Embeddings: **bge-m3** (FI-supported) vs nomic-embed-text (EN-centric) on a Finnish retrieval set — this decides the Finnish RAG stack. **Deferred: needs model downloads** (no-download constraint / no HF token at the moment).
 
+## Results — first full sweep (2026-10-02)
+
+All 5 cells on both backends (Vulkan = `build-vulkan`, ROCm = `build`), `-ngl 99`,
+llama-bench at the model-default context, server context 8192, 3 repeats + 3 streaming
+512-token requests per cell. Every cell has a complete bench/server/TTFT/power record — no
+gaps. Full per-cell metrics incl. power and temperature: [results/table.md](results/table.md).
+
+| Cell | Quant | Backend | pp2048 t/s | tg512 bench t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |
+|---|---|---|---|---|---|---|---|---|
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | vulkan | 780.42 | 55.12 | 53.18 | 143.9 | 0.62 | 59.09 |
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | rocm | 906.9 | 51.46 | 49.59 | 67.2 | 0.58 | 59.36 |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | vulkan | 1140.09 | 74.75 | 71.46 | 162.8 | 0.89 | 23.76 |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | rocm | 1288.43 | 63.2 | 58.59 | 22.5 | 0.68 | 24.12 |
+| qwen3.5-35b-a3b-q6_k | Q6_K | vulkan | 1117.97 | 61.77 | 60.26 | 688.5 | 0.8 | 27.1 |
+| qwen3.5-35b-a3b-q6_k | Q6_K | rocm | 1140.08 | 52.82 | 50.8 | 58.1 | 0.59 | 27.46 |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | vulkan | 328.65 | 10.6 | 10.52 | 1631.9 | 0.13 | 19.06 |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | rocm | 339.18 | 10.35 | 10.23 | 137.3 | 0.12 | 19.65 |
+| qwen3.8-27b-q6_k | Q6_K | vulkan | 317.69 | 10.01 | 9.96 | 809.1 | 0.12 | 20.09 |
+| qwen3.8-27b-q6_k | Q6_K | rocm | 336.27 | 9.84 | 9.73 | 150.0 | 0.11 | 20.59 |
+
+**Vulkan takes generation, ROCm takes prompt processing — 5–0 each way.** ROCm is
+-15.5% to -1.7% on `tg512` (so Vulkan is faster on every dense and MoE cell), while ROCm is
++2.0% to +16.2% on `pp2048` prefill. ROCm also runs the package hotter (up to 88 C vs 85 C).
+Read `docs/RUNNING.md` §7 before quoting a TTFT figure: on Vulkan the first timed request is
+much faster than the next two, so the mean alone is misleading (this table uses the median).
+
 ## How to run
 See **[docs/RUNNING.md](docs/RUNNING.md)** for the operator guide (stop the dev server,
 commands, per-cell behavior, results layout, caveats). Short version:
@@ -78,7 +104,7 @@ commands, per-cell behavior, results layout, caveats). Short version:
 
 ## Deliverables
 - [x] Benchmark script, one-command run → `scripts/run_sweep.py` (built; clean run pending)
-- [ ] Vulkan vs ROCm backend comparison → needs a real sweep (Phase 3/4)
+- [x] Vulkan vs ROCm backend comparison → both 5-cell sweeps done 2026-10-02 (runs `run-20261002-1734` / `run-20261002-1751`); Vulkan takes generation, ROCm takes prefill
 - [x] Results table (CSV + rendered markdown) + repo others can run → `consolidate()` + `docs/RUNNING.md` (populated for the one cell that has run)
 - [ ] Post: hardware + numbers (evergreen "own hardware" content asset)
 - [ ] Headline post candidate: "A 120B-class model on a 128 GB APU — what actually runs"
@@ -94,5 +120,9 @@ A **first clean end-to-end cell landed 2026-10-02** (`run-20261002-1719`, rocm,
 Getting there exposed two further defects, both fixed: the probe's `gen_tps` divided by a
 duration-minus-absolute-clock (reporting ~0.01 t/s for every model and silently zeroing
 `tok_per_w`), and it did not set `ignore_eos`, so a model that ends its turn on a raw
-completion prompt returned no text at all. Remaining: the full sweeps — 4 of 5 cells unrun,
-and no ROCm/Vulkan comparison yet.
+completion prompt returned no text at all.
+
+**The full sweep is done (2026-10-02): 5 cells × 2 backends, 11 valid cells, no integrity
+gaps** — every cell has bench, server-side generation, TTFT, power and tok/s/W. Headline
+result above. Next: the Finnish axis (Poro models — needs a D1 revision, it requires
+downloads) and the open Vulkan TTFT-spread question.

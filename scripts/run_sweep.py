@@ -5,6 +5,11 @@ Usage:
   run_sweep.py --backend {vulkan,rocm} [--cells id1,id2] [--repeats 3]
                [--pp-tokens 512,2048] [--tg-tokens 512] [--port 11500]
                [--force] [--rocm-override]
+  run_sweep.py --consolidate        # rebuild the rollups from existing run dirs
+
+A sweep writes <run>/<backend>/sweep.log (stdout, argv and any crash traceback),
+so an interrupted run explains itself instead of leaving run.json listing cells
+that have no artifacts.
 
 Per cell: idle-check GPU -> start resource sampler -> llama-bench (pp/tg)
 -> llama-server + TTFT probe -> aggregate to results/run-*/<cell>/cell.json.
@@ -25,6 +30,7 @@ import statistics
 import subprocess
 import sys
 import time
+import traceback
 
 try:
     import yaml
@@ -45,8 +51,34 @@ IDLE_BUSY_PCT = 5
 IDLE_VRAM_GIB = 4.0
 
 
+LOG_F = None
+
+
 def log(msg):
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+    """Print to stdout and tee into the sweep log, when one is open."""
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    print(line, flush=True)
+    if LOG_F is not None:
+        LOG_F.write(line + "\n")
+        LOG_F.flush()
+
+
+def open_sweep_log(path):
+    """Tee log() into <run dir>/sweep.log (apples to the same run on retry)."""
+    global LOG_F
+    LOG_F = open(path, "a")
+    log(f"sweep log -> {path}")
+
+
+def _excepthook(exc_type, exc, tb):
+    # A crash mid-sweep must land in sweep.log, not only on a terminal that may
+    # be long gone (run.json is written up-front and lists cells that never ran).
+    log("ABORTED with unhandled exception:\n  " + "".join(
+        traceback.format_exception(exc_type, exc, tb)).rstrip().replace("\n", "\n  "))
+    sys.__excepthook__(exc_type, exc, tb)
+
+
+sys.excepthook = _excepthook
 
 
 def rd(path, default=0):
@@ -96,9 +128,13 @@ def run_bench(binpath, model, repeats, p, n, logf, env=None):
         cells = [c.strip() for c in line.strip("|").split("|")]
         for i, c in enumerate(cells):
             if re.fullmatch(r"(pp|tg)\d+", c) and i + 1 < len(cells):
-                m = re.match(r"([\d.]+)", cells[i + 1])
+                # llama-bench -r N prints ONE row as "mean ± stddev" (it does the
+                # N runs itself). Keep both numbers — taking only the first threw
+                # away the run's sole dispersion measurement.
+                m = re.match(r"([\d.]+)(?:\s*±\s*([\d.]+))?", cells[i + 1])
                 if m:
-                    tests.setdefault(c, []).append(float(m.group(1)))
+                    tests[c] = {"mean": float(m.group(1)),
+                                "stddev": float(m.group(2)) if m.group(2) else None}
     if not tests:
         raise RuntimeError("llama-bench produced no parseable rows")
     return tests
@@ -126,7 +162,8 @@ def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None):
         results.update(run_bench(binpath, cell["file"], repeats, 0, tg_tokens, logf, env))
     finally:
         logf.close()
-    return {k: {"mean": round(statistics.fmean(v), 2), "repeats": v} for k, v in results.items()}
+    return {k: {"mean": round(v["mean"], 2), "stddev": v["stddev"], "repeats": repeats}
+            for k, v in results.items()}
 
 
 def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None):
@@ -170,7 +207,8 @@ def window_stats(rows, t0, t1):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", required=True, choices=["vulkan", "rocm"])
+    ap.add_argument("--backend", choices=["vulkan", "rocm"],
+                    help="backend to sweep (required unless --consolidate)")
     ap.add_argument("--cells", default="", help="comma-separated cell ids (default: all)")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--pp-tokens", default="512,2048")
@@ -180,7 +218,19 @@ def main():
     ap.add_argument("--force", action="store_true", help="skip idle check")
     ap.add_argument("--rocm-override", action="store_true",
                     help="set HSA_OVERRIDE_GFX_VERSION=11.5.0")
+    ap.add_argument("--consolidate", action="store_true",
+                    help="rebuild results/consolidated.csv + results/table.md from "
+                         "existing run dirs, then exit (no GPU work)")
     args = ap.parse_args()
+
+    if args.consolidate:
+        # Standalone rollup: usable after an aborted/partial sweep, which is
+        # exactly when consolidate() never got to run before.
+        consolidate()
+        log("consolidated -> results/consolidated.csv + results/table.md")
+        return
+    if not args.backend:
+        ap.error("--backend is required unless --consolidate is given")
 
     env = dict(os.environ)
     if args.rocm_override:
@@ -200,11 +250,17 @@ def main():
                                 capture_output=True, text=True).stdout.strip()
     except Exception:
         commit = "unknown"
+    try:
+        harness_commit = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"],
+                                        capture_output=True, text=True).stdout.strip()
+    except Exception:
+        harness_commit = "unknown"
     # B1: the pinned llama-bench has NO -c/--ctx flag, so bench runs at the model's
     # default context (4096). The server (llama-server) DOES accept -c and runs at
     # args.ctx. Record both so the data is never silently mislabeled.
     meta = {"run_id": run_id, "ts": time.time(), "backend": args.backend,
-            "llama_cpp_commit": commit, "cells": [c["id"] for c in cells],
+            "llama_cpp_commit": commit, "harness_commit": harness_commit,
+            "cells": [c["id"] for c in cells],
             "repeats": args.repeats, "tg_tokens": args.tg_tokens,
             "pp_tokens": pp_tokens,
             "ctx_server": args.ctx,
@@ -213,7 +269,10 @@ def main():
                               "bench tok/s measured at model default ctx, not ctx_server",
             "forced": args.force}
     json.dump(meta, open(f"{rdir}/run.json", "w"), indent=1)
-    log(f"run {run_id} backend={args.backend} cells={[c['id'] for c in cells]} "
+    open_sweep_log(f"{rdir}/sweep.log")
+    log(f"argv: {' '.join(sys.argv)}")
+    log(f"harness {harness_commit[:12]} | llama.cpp {commit[:12]} | "
+        f"backend {args.backend} | cells {[c['id'] for c in cells]} "
         f"(bench ctx = model default; server ctx = {args.ctx})")
 
     def check_idle(tag):
@@ -312,9 +371,14 @@ def consolidate():
             base = {"run_id": s["run"], "backend": s["backend"], "cell": s["cell"],
                     "model": s["model"], "quant": s["quant"], "size_gib": s["size_gib"]}
             for test, stats in s["bench"].items():
+                reps = stats.get("repeats")
+                if isinstance(reps, list):      # legacy cell.json: parsed rows list
+                    reps = len(reps)
+                sd = stats.get("stddev")
                 rows.append({**base, "metric": f"{test}_bench_tps", "unit": "t/s",
                              "value": stats["mean"],
-                             "note": f"llama-bench mean of {len(stats['repeats'])}"})
+                             "note": f"llama-bench mean of {reps}"
+                                     + (f", sd ±{sd}" if sd is not None else "")})
             # M3: N is the actual request count (len of ttft.requests), not a literal.
             nreq = len(s["ttft"].get("requests", []))
             rows.append({**base, "metric": "tg_server_tps", "unit": "t/s",

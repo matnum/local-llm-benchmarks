@@ -347,7 +347,7 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
 
 def consolidate(run_id):
     """Roll every model of this run into a CSV + markdown table (one row per model/task)."""
-    rows, models = [], []
+    rows, models, pilot = [], [], 0
     base = f"{RESULTS}/finbench-{run_id}"
     if not os.path.isdir(base):
         return
@@ -357,6 +357,7 @@ def consolidate(run_id):
             continue
         s = json.load(open(sp, encoding="utf-8"))
         models.append(cell)
+        pilot = max(pilot, s.get("pilot_limit") or 0)
         for task, d in s["tasks"].items():
             rows.append({"run_id": run_id, "cell": cell, "task": task,
                          "n": d["n"], "acc": round(d["acc"], 4),
@@ -370,17 +371,24 @@ def consolidate(run_id):
         w.writeheader()
         w.writerows(rows)
     tasks = sorted({r["task"] for r in rows})
-    md = ["# FIN-bench-v2 — Finnish capability", "",
-          "`cf` formulation, prompt variant `p0`, scored by `tools/score_ll` "
-          "(pinned llama.cpp logits). `acc` = argmax loglikelihood of the choice text; "
-          "`acc_norm` divides by the choice's character length, as the harness does.", "",
-          "| model | " + " | ".join(f"{t} acc" for t in tasks) + " | mean acc |",
-          "|---" * (len(tasks) + 2) + "|"]
+    ns = sorted({r["n"] for r in rows})
+    md = [f"# FIN-bench-v2 — Finnish capability (run `{run_id}`)", ""]
+    if pilot:
+        md += [f"> **PILOT — first {pilot} items per task only.** Not comparable with a full "
+               f"run; a task's score can move several points on the full split.", ""]
+    md += [f"`cf` formulation, prompt variant `p0`, scored by `tools/score_ll` (pinned "
+           f"llama.cpp logits). Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of "
+           f"the choice text, `acc_norm` divides by the choice's character length, exactly as "
+           f"`lm_eval/api/task.py` does. Items per task: "
+           + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns)) + ".", "",
+           "| model | " + " | ".join(tasks) + " | mean acc |",
+           "|---" * (len(tasks) + 2) + "|"]
     for cell in models:
         vals = {r["task"]: r for r in rows if r["cell"] == cell}
         accs = [vals[t]["acc"] for t in tasks if t in vals]
         md.append(f"| {cell} | " + " | ".join(
-            f"{vals[t]['acc']:.3f}" if t in vals else "–" for t in tasks)
+            f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
+            for t in tasks)
             + f" | {sum(accs) / len(accs):.3f} |")
     open(f"{RESULTS}/finbench-table.md", "w", encoding="utf-8").write("\n".join(md) + "\n")
     print(f"\nwrote {path} and {RESULTS}/finbench-table.md")

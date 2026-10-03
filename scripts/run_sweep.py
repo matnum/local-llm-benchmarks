@@ -4,8 +4,12 @@
 Usage:
   run_sweep.py --backend {vulkan,rocm} [--cells id1,id2] [--repeats 3]
                [--pp-tokens 512,2048] [--tg-tokens 512] [--port 11500]
-               [--force] [--rocm-override]
+               [--ctx 8192] [--threads 16] [--ngl 99] [--warmup 1]
+               [--power-hz 5] [--force] [--rocm-override]
   run_sweep.py --consolidate        # rebuild the rollups from existing run dirs
+
+Run-parameter defaults come from matrix.yaml `defaults` (single source of truth);
+the flags above override them per run.
 
 A sweep writes <run>/<backend>/sweep.log (stdout, argv and any crash traceback),
 so an interrupted run explains itself instead of leaving run.json listing cells
@@ -16,7 +20,7 @@ Per cell: idle-check GPU -> start resource sampler -> llama-bench (pp/tg)
 After all cells: update results/consolidated.csv and render results/table.md.
 
 Contamination rule: the GPU must be idle (busy < 5%, VRAM < 4 GiB) unless
---force. Stop the dev llama-server (:11436) before real sweeps.
+--force. Stop any running llama-server before real sweeps.
 stdlib + PyYAML only.
 """
 import argparse
@@ -101,7 +105,8 @@ def read_text(path, default="unknown"):
 def cpu_power_state():
     """The CPU power state a run was measured under.
 
-    A measurement condition, not a detail: this box runs amd_pstate=active with
+    A measurement condition, not a detail: the reference machine runs
+    amd_pstate=active with
     governor=powersave and a firmware-chosen EPP, and nothing pins them. Decision
     2026-10-02 was to leave the default state rather than force `performance`, so
     each run has to state what it measured under — otherwise a sweep taken after
@@ -159,22 +164,16 @@ def killpg(proc):
                 pass
 
 
-def run_bench(binpath, model, repeats, p, n, logf, env=None):
-    """One llama-bench invocation; returns {test: [tps, ...]}.
+def parse_bench(stdout):
+    """Parse llama-bench markdown-table stdout -> {test: {"mean": float, "stddev": float|None}}.
 
-    NOTE (B1): the pinned llama.cpp build (5b59b83f4) llama-bench has NO -c/--ctx
-    flag, so the bench runs at the model's default context (4096), NOT the sweep's
-    requested --ctx. The effective context is recorded separately in run.json
-    (bench_ctx) so the data is never silently mislabeled.
+    Extracted from run_bench so it can be tested against a captured golden table
+    without invoking the binary. The pinned build prints one row per test as
+    "mean ± stddev" (both fields present only when -r > 1); a bare number yields
+    stddev None.
     """
-    cmd = [f"{binpath}/llama-bench", "-m", model,
-           "-ngl", "99", "-t", "16", "-p", str(p), "-n", str(n), "-r", str(repeats)]
-    log("  ".join(cmd))
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
-    logf.write(out.stdout + "\n--- stderr ---\n" + out.stderr + "\n")
-    logf.flush()
     tests = {}
-    for line in out.stdout.splitlines():
+    for line in stdout.splitlines():
         if not line.startswith("|"):
             continue
         cells = [c.strip() for c in line.strip("|").split("|")]
@@ -192,6 +191,24 @@ def run_bench(binpath, model, repeats, p, n, logf, env=None):
     return tests
 
 
+def run_bench(binpath, model, repeats, p, n, logf, env=None, threads=16, ngl=99):
+    """One llama-bench invocation; returns {test: {"mean", "stddev"}}.
+
+    NOTE (B1): the pinned llama.cpp build (5b59b83f4) llama-bench has NO -c/--ctx
+    flag, so the bench runs at the model's default context (4096), NOT the sweep's
+    requested --ctx. The effective context is recorded separately in run.json
+    (bench_ctx) so the data is never silently mislabeled.
+    """
+    cmd = [f"{binpath}/llama-bench", "-m", model,
+           "-ngl", str(ngl), "-t", str(threads), "-p", str(p), "-n", str(n),
+           "-r", str(repeats)]
+    log("  ".join(cmd))
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
+    logf.write(out.stdout + "\n--- stderr ---\n" + out.stderr + "\n")
+    logf.flush()
+    return parse_bench(out.stdout)
+
+
 def wait_health(base, timeout=600):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -205,23 +222,27 @@ def wait_health(base, timeout=600):
     raise RuntimeError(f"server not healthy within {timeout}s")
 
 
-def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None):
+def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None,
+               threads=16, ngl=99):
     logf = open(f"{cdir}/bench.log", "w")
     try:
         results = {}
         for p in pp_tokens:
-            results.update(run_bench(binpath, cell["file"], repeats, p, 0, logf, env))
-        results.update(run_bench(binpath, cell["file"], repeats, 0, tg_tokens, logf, env))
+            results.update(run_bench(binpath, cell["file"], repeats, p, 0, logf,
+                                     env, threads, ngl))
+        results.update(run_bench(binpath, cell["file"], repeats, 0, tg_tokens, logf,
+                                 env, threads, ngl))
     finally:
         logf.close()
     return {k: {"mean": round(v["mean"], 2), "stddev": v["stddev"], "repeats": repeats}
             for k, v in results.items()}
 
 
-def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None):
+def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None,
+               threads=16, ngl=99, warmup=1):
     srv = subprocess.Popen(
         [f"{binpath}/llama-server", "-m", cell["file"], "--host", "127.0.0.1",
-         "--port", str(port), "-c", str(ctx), "-ngl", "99", "-t", "16",
+         "--port", str(port), "-c", str(ctx), "-ngl", str(ngl), "-t", str(threads),
          "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0", "-np", "1",
          "--alias", cell["id"]],
         stdout=open(f"{cdir}/server.log", "w"), stderr=subprocess.STDOUT,
@@ -234,7 +255,7 @@ def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None):
         wait_health(base, timeout=timeout)
         ts = time.time()
         subprocess.run([sys.executable, f"{REPO}/scripts/ttft_probe.py", base,
-                        cell["id"], "1", str(repeats), str(tg_tokens),
+                        cell["id"], str(warmup), str(repeats), str(tg_tokens),
                         f"{cdir}/ttft.json"], check=True, timeout=3600)
         ts_end = time.time()
         with open(f"{cdir}/ttft.json") as f:
@@ -257,22 +278,56 @@ def window_stats(rows, t0, t1):
     }
 
 
-def main():
+def load_matrix():
+    with open(f"{REPO}/matrix.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def _ngl(gpu_layers):
+    """Translate matrix.yaml `gpu_layers` into a llama.cpp -ngl value ("all" -> 99)."""
+    return 99 if gpu_layers == "all" else int(gpu_layers)
+
+
+def build_parser(defaults):
+    """ArgumentParser whose defaults derive from matrix.yaml `defaults` (I-1).
+
+    The matrix is the single source of truth for run parameters; argparse defaults
+    are computed from it rather than duplicated as literals, so editing a value in
+    matrix.yaml actually changes the sweep instead of being silently ignored.
+    """
     ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", choices=["vulkan", "rocm"],
+    ap.add_argument("--backend", choices=defaults.get("backends", ["vulkan", "rocm"]),
                     help="backend to sweep (required unless --consolidate)")
     ap.add_argument("--cells", default="", help="comma-separated cell ids (default: all)")
-    ap.add_argument("--repeats", type=int, default=3)
-    ap.add_argument("--pp-tokens", default="512,2048")
-    ap.add_argument("--tg-tokens", type=int, default=512)
+    ap.add_argument("--repeats", type=int, default=int(defaults.get("repeats", 3)))
+    ap.add_argument("--pp-tokens",
+                    default=",".join(str(x) for x in defaults.get("pp_tokens", [512, 2048])))
+    ap.add_argument("--tg-tokens", type=int, default=int(defaults.get("tg_tokens", 512)))
     ap.add_argument("--port", type=int, default=11500)
-    ap.add_argument("--ctx", type=int, default=8192)
+    ap.add_argument("--ctx", type=int, default=int(defaults.get("ctx_size", 8192)))
+    ap.add_argument("--threads", type=int, default=int(defaults.get("threads_cpu", 16)),
+                    help="CPU threads for llama-bench/llama-server (threads_cpu)")
+    ap.add_argument("--ngl", type=int, default=_ngl(defaults.get("gpu_layers", "all")),
+                    help="GPU layers (-ngl); matrix gpu_layers 'all' -> 99")
+    ap.add_argument("--warmup", type=int, default=int(defaults.get("warmup_requests", 1)),
+                    help="untimed warmup requests before the timed TTFT probe")
+    ap.add_argument("--power-hz", type=int, default=int(defaults.get("power_sample_hz", 5)),
+                    help="resource sampler rate (power_sample_hz)")
     ap.add_argument("--force", action="store_true", help="skip idle check")
     ap.add_argument("--rocm-override", action="store_true",
                     help="set HSA_OVERRIDE_GFX_VERSION=11.5.0")
     ap.add_argument("--consolidate", action="store_true",
                     help="rebuild results/consolidated.csv + results/table.md from "
                          "existing run dirs, then exit (no GPU work)")
+    return ap
+
+
+def main():
+    # Load the matrix first: its `defaults` block is the single source of truth for
+    # run parameters (I-1), so argparse defaults derive from it rather than being
+    # duplicated as literals elsewhere.
+    matrix = load_matrix()
+    ap = build_parser(matrix.get("defaults") or {})
     args = ap.parse_args()
 
     if args.consolidate:
@@ -288,11 +343,14 @@ def main():
     if args.rocm_override:
         env["HSA_OVERRIDE_GFX_VERSION"] = "11.5.0"
 
-    with open(f"{REPO}/matrix.yaml") as f:
-        matrix = yaml.safe_load(f)
     pp_tokens = [int(x) for x in args.pp_tokens.split(",")]
     cells = [c for c in matrix["cells"]
              if not args.cells or c["id"] in args.cells.split(",")]
+    # matrix.yaml stores model paths as ~/-relative (no home-directory username in
+    # the committed file); expand them so os.path.isfile() and llama-bench/server
+    # resolve them on this machine.
+    for c in cells:
+        c["file"] = os.path.expanduser(c["file"])
 
     run_id = time.strftime("run-%Y%m%d-%H%M")
     rdir = f"{REPO}/results/{run_id}/{args.backend}"
@@ -342,8 +400,8 @@ def main():
         if not ok:
             if not args.force:
                 log(f"[{tag}] GPU NOT idle after {IDLE_SETTLE_S}s "
-                    f"(busy={busy}%, vram={vram:.1f} GiB) — stop the dev "
-                    "llama-server (:11436) and rerun, or pass --force")
+                    f"(busy={busy}%, vram={vram:.1f} GiB) — stop the running "
+                    "llama-server and rerun, or pass --force")
                 return False
             log(f"[{tag}] GPU not idle (busy={busy}%, vram={vram:.1f} GiB) but --force: "
                 "continuing, this cell's results are CONTAMINATED")
@@ -367,17 +425,19 @@ def main():
         os.makedirs(cdir, exist_ok=True)
         log(f"=== {cell['id']} ({cell['quant']}, {cell['size_gib']} GiB) ===")
         sampler = subprocess.Popen([sys.executable, f"{REPO}/scripts/sampler.py",
-                                    f"{cdir}/resources.csv", "5"],
+                                    f"{cdir}/resources.csv", str(args.power_hz)],
                                    start_new_session=True, env=env)
         phases = {}
         try:
             phases["bench_start"] = time.time()
             bench = bench_cell(env_binpath(args), cell, args.repeats,
-                               pp_tokens, args.tg_tokens, cdir, env)
+                               pp_tokens, args.tg_tokens, cdir, env,
+                               args.threads, args.ngl)
             phases["bench_end"] = time.time()
             log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
             ttft, p0, p1 = probe_cell(env_binpath(args), cell, args.ctx, args.port,
-                                      cdir, args.repeats, args.tg_tokens, env)
+                                      cdir, args.repeats, args.tg_tokens, env,
+                                      args.threads, args.ngl, args.warmup)
             phases["probe_start"], phases["probe_end"] = p0, p1
             log(f"  probe: ttft={ttft['ttft_ms_mean']}ms gen={ttft['gen_tps_mean']} t/s")
         finally:
@@ -417,14 +477,25 @@ def env_binpath(args):
     return BUILDS[args.backend]
 
 
-def consolidate():
+def git_head(repo):
+    """Return the git HEAD of `repo`, or "unknown" if it is not a git checkout."""
+    try:
+        return subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def consolidate(repo=REPO):
     """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
     rows = []
-    for rj in sorted(glob.glob(f"{REPO}/results/run-*/**/run.json", recursive=True)):
+    for rj in sorted(glob.glob(f"{repo}/results/run-*/**/run.json", recursive=True)):
         rd_ = os.path.dirname(rj)
-        meta = json.load(open(rj))
+        # run.json only locates the run dir (via the glob above); its contents are
+        # not needed here, so don't open it.
         for cj in sorted(glob.glob(f"{rd_}/*/cell.json")):
-            s = json.load(open(cj))
+            with open(cj) as f:
+                s = json.load(f)
             res = s["resources"]
             base = {"run_id": s["run"], "backend": s["backend"], "cell": s["cell"],
                     "model": s["model"], "quant": s["quant"], "size_gib": s["size_gib"]}
@@ -469,7 +540,7 @@ def consolidate():
                 rows.append({**base, "metric": "tok_per_w", "unit": "t/s/W",
                              "value": s["tok_per_w"], "note": "server tg / probe W mean"})
 
-    path = f"{REPO}/results/consolidated.csv"
+    path = f"{repo}/results/consolidated.csv"
     fields = ["run_id", "backend", "cell", "model", "quant", "size_gib",
               "metric", "unit", "value", "note"]
     # B3: rebuild the whole file ("w") — rows are already re-derived from ALL run
@@ -481,10 +552,15 @@ def consolidate():
         w.writerows(rows)
 
     # render table.md (all runs)
+    # M7: record which harness build produced the rollup. run.json stamps the
+    # capture-time harness; this stamps the consolidate-time one, so the tracked
+    # rollup carries its own provenance instead of implying an unrecorded driver.
+    rollup_commit = git_head(repo) or "unknown"
     md = ["# Results", "",
-          "> Sustained = llama-server streaming 512-token generations. "
-          "bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. "
-          "TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.", ""]
+          f"> Rollup built by harness `{rollup_commit[:12]}`. Sustained = llama-server "
+          "streaming 512-token generations. bench = llama-bench (mean of repeats). "
+          "probe W = GPU power mean during server phase. TTFT mean is inflated where "
+          "the per-request spread is wide (Vulkan) — compare with p50.", ""]
     runs = {}
     for r in rows:
         runs.setdefault((r["run_id"], r["backend"]), []).append(r)
@@ -506,7 +582,8 @@ def consolidate():
                 w=m.get("power_w_probe", "–"), e=m.get("tok_per_w", "–"),
                 v=m.get("vram_peak_gib", "–")))
         md.append("")
-    open(f"{REPO}/results/table.md", "w").write("\n".join(md))
+    with open(f"{repo}/results/table.md", "w") as f:
+        f.write("\n".join(md))
 
 
 if __name__ == "__main__":

@@ -1,157 +1,162 @@
-# Code & Plan Review — local-llm-benchmarks
+# Independent Code Review — local-llm-benchmarks
 
-**Date:** 2026-09-30 · **Reviewer:** independent (no shared context with implementer)
-**Scope:** full repo at commit `e6c1e32` + untracked `scripts/` (3 harness files, ~460 LOC) + smoke-run artifacts.
-**Verdict: NOT APPROVED as-is.** Scaffold/docs are solid; the harness has 3 blocking defects, none of which
-were caught because no successful end-to-end run exists yet.
+**Date:** 2026-10-03 · **Reviewer:** independent (no shared context with implementer)
+**Scope:** full repo at HEAD `e90dfd1` (`main`), working tree including the uncommitted deletion of the
+prior `REVIEW.md` and the untracked `SMOKE_COMMAND.txt`; all 3 harness scripts (~730 LOC) and the tracked
+rollups (`results/consolidated.csv`, `results/table.md`).
+**Verdict: APPROVED for the harness + results deliverable (no blocking issues).**
+The prior review (commit `e6c1e32`, "NOT APPROVED") flagged 3 blocking (B1–B3) and 4 important (I1–I4)
+issues. All of them are fixed and now verified against real run artifacts, not just code inspection. The
+full sweep has landed and the rollups are internally consistent and idempotent.
+
+> **Post-review resolution (2026-10-03):** the two Important issues below (I-1 dead `matrix.yaml`
+> `defaults`, I-2 no tests) were subsequently fixed at the operator's request. I-1: `run_sweep.py` now
+> reads `matrix.yaml` `defaults` via `build_parser()` and threads `threads/ngl/warmup/power-hz` through to
+> the bench/server/sampler subprocesses. I-2: a stdlib-`unittest` suite (`tests/`, 9 tests) now covers the
+> `llama-bench` parser, `consolidate()` rebuild-not-append, and the defaults wiring; `consolidate()` also
+> got its file handles closed and the unused `meta` read removed. Verified: `python3 -m unittest discover
+> -s tests` → 9 passed, and `--consolidate` still reproduces the tracked rollups byte-identically (121
+> rows).
+>
+> Minor items also resolved (2026-10-03): M-1 (removed `SMOKE_COMMAND.txt`; this file restores the
+> dangling `REVIEW.md` references), M-4 (renamed `run-20261002-1710/` → `superseded-aborted-…`), M-7
+> (`table.md` now records the rollup's own harness commit), and the README was rewritten for public
+> consumption (internal roadmap language removed; the `tg512` figure corrected to 1.7–18.3%).
 
 ---
 
 ## 1. Overall assessment
 
-The planning layer is excellent: decisions D1–D4 are explicit and mutually consistent, the matrix is frozen
-and byte-verified against `~/.local/share/models/` (all 5 GGUF sizes in `matrix.yaml` match disk, ~152 GB
-total, confirmed), `docs/env.md` is a real fingerprint, and the README corrections (CachyOS, on-disk matrix,
-status) are accurate. `.gitignore` correctly keeps raw runs and models out of git.
+The repo has gone from scaffold to a completed benchmark deliverable since the prior review. The harness
+(`scripts/run_sweep.py`, `scripts/sampler.py`, `scripts/ttft_probe.py`) is stdlib + PyYAML only, idle-gated
+at start **and** per cell with a settle wait, fail-loud on missing sensors/models, and stamps CPU power
+state + both contexts into `run.json`. Security posture is clean: no secrets (scanned; the only "token"
+hits are `max_tokens`/HF-token *mentions*), no `shell=True`, all subprocess calls use argv lists, the
+server binds `127.0.0.1`, and model paths come from a trusted local `matrix.yaml`.
 
-The harness (`run_sweep.py`, `ttft_probe.py`, `sampler.py`) is the right shape — stdlib-only, idle-gated,
-sampler-windowed, fail-loud on contamination via `--force` flagging. But the one smoke run that exists
-(`results/run-20260930-1851/`, gitignored) **failed**: its `bench.log` ends in
-`error: invalid parameter for argument: -c`, the run was `--force`d onto a busy GPU (87% busy, 22.1 GiB
-VRAM at sampler start), and it produced 2 rows of resources.csv and no `cell.json`. So the harness has
-never produced a valid result, and its three blocking bugs are all latent-but-provable.
+The data is real and cross-checkable. I re-ran the driver's own `--consolidate` on a scratch copy of
+`scripts/ + results/ + matrix.yaml` and it reproduced the tracked `consolidated.csv` and `table.md`
+**byte-identically** — 121 data rows = 11 cells × 11 metrics (no duplicates), confirming B3 is fixed and
+the tracked rollups are current. All 11 valid cells report `complete_decodes: true`, and every
+`ttft.json` decode ran the full 512-token budget (finish_reason "length"). The README headline table
+matches `consolidated.csv` value-for-value (spot-checked pp2048/tg512/TTFT-p50/tok-per-W/VRAM across both
+backends), and the "Vulkan takes generation, ROCm takes prefill — 5–0 each way" claim is accurate against
+the data.
 
-Security posture is clean: no secrets, no `shell=True`, all `subprocess` calls use argv lists, server
-binds 127.0.0.1, model paths come from a trusted local matrix (no traversal surface). No action needed.
+Prior findings, verified fixed: B1 (`llama-bench -c` dropped, `ctx_bench`/`ctx_server` both recorded in
+`run.json`), B2 (`--rocm-override` env now threaded into `run_bench`/`probe_cell`/server Popen), B3
+(`consolidate()` opens `"w"`, rebuilds from all run dirs), I1 (`temp1_input` /1000.0 → sane 72–88 °C),
+I2 (`power_w_probe` key now matches), I3 (per-cell idle check + 90 s settle), I4 (hwmon resolved by name,
+loud failure on missing sensors, per-sample read failures skip + warn instead of silent zeros). M3/M5/M6/M7
+from the prior review are also resolved (actual request counts in notes, `bench.log` closed in a
+`finally`, model pre-check at loop start, server timeout scaled by model size).
+
+---
 
 ## 2. Blocking issues
 
-### B1 — `llama-bench -c` is not a valid flag in the pinned build → every bench fails
-`run_bench()` (`scripts/run_sweep.py:71-72`) passes `-c <ctx>`. The pinned
-`~/.local/opt/llama.cpp @ 5b59b83f4` `llama-bench` has **no context flag at all** (verified: `--help`
-lists no `-c/--ctx`; only `-fitc/--fit-ctx` exists). The smoke run proves it: `bench.log:66`
-`error: invalid parameter for argument: -c`.
-**Impact:** `bench_cell()` raises on every cell; the pp/tg numbers — half the deliverable — are never
-produced. Worse, the pinned binary cannot set context size for bench runs at all, so the plan's
-"ctx 8192" methodology is unachievable with this build (bench runs at the model default, 4096) while
-`run.json` metadata still records `ctx: 8192` — a data-integrity mismatch.
-**Fix:** drop `-c` from `run_bench()` and either (a) accept default-ctx bench numbers and say so in
-metadata/README (change plan wording), or (b) treat "ctx 8192 for bench" as a reason to rebuild
-llama.cpp — which conflicts with D2 and needs an explicit decision. Either way, record the *effective*
-ctx in `run.json`.
+None.
 
-### B2 — `--rocm-override` is a no-op
-`main()` builds `env = dict(os.environ)` and sets `HSA_OVERRIDE_GFX_VERSION=11.5.0`
-(`run_sweep.py:165-167`), but that dict is **never passed** to `subprocess.run(...)` / `subprocess.Popen(...)`
-(no `env=` keyword anywhere; subprocesses inherit the unmodified `os.environ`).
-**Impact:** the Phase-4 mitigation for the #1 known risk (gfx1151 MoE/MXFP4 instability, PLAN §5) is
-silently disabled. A ROCm sweep would "retry with override" and get identical failures.
-**Fix:** thread `env` through `run_bench()` and `probe_cell()` and pass `env=env`.
-
-### B3 — `consolidate()` appends to `consolidated.csv` instead of rebuilding
-`consolidate()` reads **all** run dirs, then opens `results/consolidated.csv` in mode `"a"`
-(`run_sweep.py:282-290`). Every call re-emits every run's rows → rows duplicate on each sweep.
-**Reproduced:** in a scratch copy with one fixture cell, running `consolidate()` twice yielded
-18 identical data rows (lines 2–10 duplicated at 11–19). Even with one run per sweep, the Vulkan pass
-(Phase 3) followed by ROCm (Phase 4) would double every Vulkan row in the canonical results file.
-**Fix:** open with `"w"` and rewrite the whole file (it is already rebuilt in memory from all run dirs —
-that was clearly the intent).
+---
 
 ## 3. Important issues
 
-### I1 — Sampler temperature is 10× too large
-`sampler.py:34`: `temp_c = rd(...) / 100.0`. amdgpu hwmon `temp1_input` is in **millidegrees**: raw
-`/sys/class/hwmon/hwmon2/temp1_input` = 67000 right now → 67.0 °C, but the smoke `resources.csv`
-records `680.0`. PLAN §3 makes temperature logging the throttling-detection mechanism ("throttling is a
-finding"); at this scale the column is unusable (680 °C "throttling" on every run).
-**Fix:** `/1000.0`.
+### I-1 — `matrix.yaml` `defaults` block is dead configuration (never read by the driver) — RESOLVED 2026-10-03
+`matrix.yaml:5-14` declares `defaults: {backends, gpu_layers, threads_cpu, ctx_size, pp_tokens, tg_tokens,
+repeats, warmup_requests, power_sample_hz}`. `run_sweep.py` loads the YAML but reads **only**
+`matrix["cells"]` (`run_sweep.py:291-295`); a repo-wide grep for `defaults` returns zero hits in the driver.
+Every value in that block is instead hardcoded elsewhere: threads `16` (`run_bench`, `run_sweep.py:171`),
+server ctx `8192` (arg default `run_sweep.py:269`), pp `512,2048` (`:266`), tg `512` (`:267`), repeats `3`
+(`:265`), warmup `1` (`probe_cell`, `:237`), sampler Hz `5` (`main`, `:369-370`).
+**Impact:** the "frozen matrix" reproducibility surface is decorative — an operator who edits
+`threads_cpu` or `ctx_size` in `matrix.yaml` expecting the sweep to honor it gets silent divergence (the
+run still succeeds, but not under the declared conditions). This is a documented-knob-that-is-not-wired
+gap, the kind that has bitten this exact repo before (the `-c`/ctx mismatch in B1).
+**Fix:** either wire `matrix["defaults"]` into the argparse defaults (single source of truth), or delete
+the `defaults` block and state in `matrix.yaml`/`RUNNING.md` that all run parameters are CLI flags.
 
-### I2 — `table.md` probe-power column is always blank
-`run_sweep.py:313` looks up `m.get("power_w_prob", "–")`; the metric is written as `power_w_probe`
-(`wname[:5]` of `"probe_window"`). Reproduced in the rendered scratch table: probe W column = `–` even
-with data present. **Fix:** `power_w_probe`.
+### I-2 — No automated test suite — RESOLVED 2026-10-03
+Still true from the prior review ("Missing evidence", item 5). The harness's correctness today rests on
+one real sweep plus this review's re-run of `--consolidate`. The three worst historical defects — B3
+(append-mode row duplication), I2 (`power_w_prob` vs `power_w_probe`), and the `gen_tps` absolute-clock
+divisor bug — would each have been caught by a trivial golden-file test. The README's stated deliverable
+is "repo others can run"; a repo whose parser and rollup have no tests is a regression magnet for anyone
+who touches `run_sweep.py` without the GPU in front of them.
+**Fix (minimum viable):** (a) a `tests/` fixture that feeds a captured `llama-bench` table through
+`run_bench()`'s parser and asserts `pp512/pp2048/tg512` means+stddev; (b) a `consolidate()` test on a
+two-run fixture asserting exact row count and no duplicates; (c) run them via `--consolidate`-style
+stdlib-only invocation so no pytest dependency is introduced.
 
-### I3 — Idle check runs once, not per cell
-PLAN §3/§5: "GPU must be idle **before each cell**". `run_sweep.py:190` checks once before the loop;
-a 10-cell sweep spans hours (a 59 GB load alone takes minutes), so a background process starting
-mid-sweep contaminates later cells with no detection. **Fix:** call `gpu_idle()` at the top of the
-cell loop (respecting `--force`).
-
-### I4 — Silent zero-fallbacks in the sampler
-`sampler.py:17-22` `rd()` returns `0` on any read error, and the hwmon index is hardcoded
-(`hwmon2`). hwmon numbering is not stable across reboots/driver updates. Failure mode: an
-all-zeros `resources.csv` that looks like a plausible run — for a benchmark repo, silent zero power
-is worse than a crash. **Fix:** resolve hwmon by `name == amdgpu` at start; fail loudly if the
-expected files are missing; warn (not default) on per-sample read failures.
-
-### I5 — The only on-disk result is a failed, contaminated run
-`results/run-20260930-1851/` was `--force`d with the dev server running (busy 87%, VRAM 22.1 GiB —
-the dev llama-server, per `docs/env.md`), bench failed (B1), 2 resource rows, no `cell.json`. It is
-gitignored so it won't pollute git, but it *will* be picked up by `consolidate()`'s glob if it ever
-gained a `cell.json`, and its `run.json` (`forced: true`) is the only evidence of a harness run.
-**Fix:** delete the run dir or rename it `run-20260930-1851-SMOKE-FAILED/` so `consolidate()`'s
-`run-*` glob can't treat it as data; re-run a real smoke after B1/B2 fixes.
+---
 
 ## 4. Minor issues
 
-- **M1 — `scripts/` is untracked** (`git status`: `?? scripts/`). The harness has never been committed;
-  the "Scaffold" commit message oversells. Commit it (after fixes) so the Phase-2 work is reproducible.
-- **M2 — Doc drift:** PLAN §3 documents `./scripts/run_sweep.sh --backend …`; implementation is
-  `run_sweep.py` with no shell wrapper. Align one or the other.
-- **M3 — Hardcoded metric names:** `consolidate()` only emits rows for `pp512/pp2048/tg512`
-  (`run_sweep.py:258`); custom `--pp-tokens`/`--tg-tokens` (e.g. 1024) silently drop from the CSV
-  while still present in `cell.json`. Same for the `table.md` column set. The note `"streaming, mean of
-  N"` is a literal N, not the actual count (available in `ttft.json`).
-- **M4 — Dependency undeclared:** `run_sweep.py` needs PyYAML (docstring admits it). System
-  `/usr/bin/python3.14` has `python-yaml 6.0.3` (verified), but the `#!/usr/bin/env python3` shebang
-  resolves to whatever `python3` the operator has on PATH — a venv python without yaml breaks at line 29
-  with a bare ImportError. Add a one-line dependency note in the README/PLAN or a `requirements.txt`.
-- **M5 — `bench_cell` opens `bench.log` without a context manager** (`run_sweep.py:106`): leaked fd /
-  unflushed tail if `run_bench` raises (which it does today, per B1).
-- **M6 — No model-file existence pre-check:** a typo'd/renamed GGUF surfaces only after minutes of
-  nothing, deep in a 10-hour sweep. `os.path.isfile(cell["file"])` at loop start is a 1-liner.
-- **M7 — `wait_health` timeout is 600 s** for server startup: plausible for 19–27 GB models, but the
-  59 GB gpt-oss-120b cell may need longer; make it a function of `size_gib` or raise it.
-- **M8 — Reproducibility step unimplemented:** PLAN §3 says every sweep is "git commit + tag
-  `run-YYYYMMDD-N`"; the driver never does this (nor does it fix the CPU governor, PLAN §3
-  "controlled conditions"). Acceptable for now if tracked, but it is a stated exit-criterion for the
-  deliverable "repo others can run".
+- **M-1 — Working-tree hygiene / dangling references — RESOLVED 2026-10-03.** `REVIEW.md` is deleted (uncommitted) but still
+  referenced from `README.md:102,116` and `docs/RUNNING.md:8`. `SMOKE_COMMAND.txt` is untracked and stale
+  (references "REVIEW.md step 3", duplicates `RUNNING.md` §3). This report restores `REVIEW.md`;
+  `SMOKE_COMMAND.txt` should be deleted or folded into `RUNNING.md`.
+- **M-2 — `consolidate()` reads `run.json` into `meta` and never uses it** (`run_sweep.py:425`). Dead
+  read; worse, a malformed `run.json` would raise and abort the entire rollup. Drop the variable or use it
+  (e.g. to stamp `forced`/`ctx` into the notes).
+- **M-3 — `env_binpath(args)` is a misnomer** (`run_sweep.py:416-417`): it returns a binaries path, not an
+  environment. Cosmetic; rename to `binpath(args)`.
+- **M-4 — Leftover aborted run dir `results/run-20261002-1710/` — RESOLVED 2026-10-03.** Its `sweep.log:9-29` shows the pre-fix
+  `gen_tps` probe abort (exit 1), leaving `bench.log` + a 949-row `resources.csv` + `server.log` with no
+  `cell.json`. Gitignored and excluded from the rollup (no `cell.json`), so harmless — but it does not
+  follow the repo's own `-SMOKE-FAILED` / `superseded-*` naming convention for known-bad runs.
+- **M-5 — Power windows omit the server-load phase.** `window_stats` slices `resources.csv` into
+  bench/probe/cell windows (`run_sweep.py:247-257`); the server weight-load between `bench_end` and
+  `probe_start` falls in no power window (only `temp_c_max`/`vram_peak_gib` capture it via `cell_window`).
+  Documented as "generation-phase efficiency" so not wrong, but the `W` columns are easy to misread as
+  whole-cell draw. Consider adding a `load_window` or a note on the table.
+- **M-6 — `llama-bench` parser is column-positional** (`run_sweep.py:177-192`): it assumes the value is the
+  cell immediately after the `pp/tgN` test-name cell. Correct against the pinned build `5b59b83f4` (proven
+  by 11 cells) but fragile if a future llama.cpp adds a column between the test name and t/s. A golden-file
+  test (I-2) would make this breakage visible instead of a silent empty `tests` dict.
+- **M-7 — Run metadata records the capture-time harness, not the consolidate-time harness — RESOLVED 2026-10-03.**
+  `run-20261002-1751/rocm/run.json` stamps `harness_commit: 3e6b108`, but the rollup's `ttft_ms_p50` column
+  was added by a later commit (`07f2162`) and the CSV was re-derived with the newer driver. Harmless
+  because `cell.json` carries every raw value, but "repo others can run" would be tighter if the rollup
+  also recorded the driver commit that produced it.
+
+---
 
 ## 5. Missing evidence / tests
 
-1. **No successful end-to-end cell run exists.** Phase-2 exit criterion ("one clean run producing a
-   valid CSV: tok/s, TTFT, peak VRAM, W") is unmet. Every claim in the harness about what it measures
-   is currently unexercised.
-2. **The llama-bench table parser has never parsed real output** (the only run died on `-c`). Its
-   regex-based column-walking is plausible but unverified against this build's md table format.
-3. **`ttft_probe.py` SSE parsing is unverified** (server never started in the smoke run). Flag
-   compatibility (`-fa/-ctk/-ctv/-np/--alias`) should be checked against this build once the server
-   actually boots.
-4. **No unit checks on sampler values**: the temp bug (I1) shows that "plausible-looking CSV" ≠
-   correct units. Cross-check one sample against `rocm-smi --showpower` (the sampler's own docstring
-   says to — do it in the smoke run).
-5. **No test suite at all.** Minimum viable: a parser test against a captured golden `llama-bench`
-   stdout, and a `consolidate()` test asserting no duplicate rows (would have caught B3).
-6. **Vulkan backend never smoke-tested through the harness** (only the ROCm device init appears in
-   `bench.log`). Plan Phase 1 required both backends to load + generate.
+1. **No test suite** — see I-2. Nothing guards the parser, the window slicing, or `consolidate()`
+   idempotency.
+2. **The sampler's own power cross-check is unrecorded.** `sampler.py:16-18` mandates "cross-check one
+   sample against `rocm-smi --showpower --showtemp` per cell"; I found no captured `rocm-smi` output or
+   note in `results/`. The temperature units are proven sane (72–88 °C, I1 fixed), but the **power** units
+   (µW→W) remain verified only by plausibility, not by the documented cross-check.
+3. **Vulkan TTFT-spread root cause is still open** (`RUNNING.md` §7) — correctly documented and carried as
+   `ttft_ms_p50` alongside the mean, so not a harness gap; just don't quote a Vulkan TTFT mean without the
+   p50 caveat.
+
+---
 
 ## 6. Recommended next step
 
-In order, all in one sitting:
-1. Fix B1 (drop `-c`, decide and record effective ctx), B2 (thread `env=`), B3 (`"w"` mode), I1 (`/1000`),
-   I2 (`power_w_probe`), I3 (per-cell idle check), I4 (resolve hwmon by name, fail loud).
-2. Delete/mark the failed smoke run dir (I5).
-3. Re-run one 1-cell smoke (e.g. `qwen3.8-27b-q5_k_xl`, ROCm) with the GPU actually idle (dev server
-   stopped — coordinate with user), and verify: valid `cell.json`, non-zero sane temp/power (cross-check
-   `rocm-smi`), `table.md` probe-W column populated, `consolidated.csv` row count == 1 cell × metrics.
-4. Commit `scripts/` + report (M1) and only then start Phase 3 (Vulkan sweep).
+In order, low-risk, no GPU needed:
 
-Nothing here blocks the *docs/plan* work — those are shippable. The harness must not run a full sweep
-until B1–B3 are fixed: a full contaminated sweep costs ~5 h per backend and would poison the canonical
-CSV.
+1. Resolve `matrix.yaml` `defaults` (I-1): wire it into argparse defaults or delete it — pick one, don't
+   leave a dead block that implies knobs that do nothing.
+2. Add the two cheap tests from I-2 (parser golden-file + consolidate idempotency) as stdlib-only scripts
+   so the "others can run" claim is actually protected.
+3. Clean the working tree: remove `SMOKE_COMMAND.txt`, rename/delete `results/run-20261002-1710/`, and
+   commit this `REVIEW.md` (which resolves the deleted-file + dangling-reference state in M-1).
+4. Perform and record the one `rocm-smi` power cross-check (missing-evidence item 2) next time a cell runs.
+5. No harness changes block the remaining deliverables (Finnish evals, embeddings, posts). The next sweep
+   can proceed with the current driver.
+
+Nothing in this review authorizes any financial, production, customer-facing, or security-sensitive action.
+The reviewed artifacts are benchmark data and tooling inside this repository; external publication of the
+headline numbers remains the operator's decision and should carry the Vulkan TTFT caveat attached.
 
 ---
-*Method: full read of all 10 tracked files + 3 scripts; live verification of model files/sizes, llama.cpp
-commit, build binaries, hwmon paths, and llama-bench flag surface; reproduction of B3 and I2 in a scratch
-copy of the repo (fabricated fixture cell, real `consolidate()` code). No changes made to the reviewed
-repo other than this file.*
+
+*Method: full read of all 11 tracked files + 3 scripts; `git log/status/diff`; secrets + `shell=True` +
+tracked-pyc scans; live re-run of the driver's own `--consolidate` on a scratch copy (byte-identical to the
+tracked rollups, 121 rows, no duplicates); per-`ttft.json` `complete_decodes` check across all 11 valid
+cells; value-for-value spot-check of the README headline table against `consolidated.csv`. No changes made
+to the reviewed repo other than this file.*

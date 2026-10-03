@@ -1,6 +1,9 @@
 # Frozen benchmark matrix — ON-DISK models only (decision D1: no downloads).
 # Sizes are the exact GGUF files in ~/.local/share/models/ (verified 2026-09-30).
-# Bench params are per-cell overridable; defaults below are the sweep standard.
+# Bench params are per-cell overridable; `defaults` below are the sweep standard.
+# `defaults` is the single source of truth for run parameters: run_sweep.py's
+# build_parser() reads it to set the argparse defaults, so editing a value here
+# changes the sweep (each flag also overridable per run on the CLI).
 
 defaults:
   backends: [vulkan, rocm]        # vulkan = build-vulkan (reference), rocm = build (HIP)

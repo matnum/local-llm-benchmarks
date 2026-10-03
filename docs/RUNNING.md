@@ -2,19 +2,11 @@
 
 Operator guide for `scripts/run_sweep.py` — the one-command sweep driver.
 Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLAN.md)
-(locked decisions + methodology + phases), [env.md](env.md) (verified machine fingerprint).
+(design decisions + methodology), [env.md](env.md) (reference-machine fingerprint).
 
-> **Current state (2026-10-02):** the harness is implemented, independently reviewed
-> ([REVIEW.md](../REVIEW.md)), and the blocking/important fixes (B1–B3, I1–I4) are
-> committed on branch `fix/harness-b1-b3-i1-i4`. A **clean end-to-end cell has landed**:
-> `run-20261002-1719` (rocm, `qwen3.8-27b-q5_k_xl`) exercised the `llama-bench` table
-> parser, the SSE probe and the power sampler against the pinned build — see
-> `results/table.md`. Only 1 of 5 cells and 1 of 2 backends exist so far; the full Vulkan
-> and ROCm sweeps are still to run.
->
-> Runs predating 2026-10-02 have invalid server-side numbers: `run-20260930-2239` measured
-> `gen_tps` with the clock bug described in §7 and is kept as
-> `results/superseded-pre-fix-20260930-2239/` (excluded from the rollup).
+> **State:** the full 5-cell × 2-backend sweep is done (2026-10-02) — see
+> [results/table.md](../results/table.md). The harness is independently reviewed
+> ([REVIEW.md](../REVIEW.md)). This guide documents how to run it.
 
 ---
 
@@ -22,9 +14,9 @@ Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLA
 
 | Need | Detail |
 |---|---|
-| This machine | The pinned llama.cpp builds and all 5 GGUF models are already on disk (see [env.md](env.md)). No downloads. |
-| Python for the driver | Must import **PyYAML** (only `run_sweep.py` needs it — to parse `matrix.yaml`). On this box use **`/usr/bin/python3`** (system, has PyYAML). The `python3` on a shell PATH that points at a venv has no PyYAML and the driver refuses with an install hint. The two helpers (`sampler.py`, `ttft_probe.py`) are stdlib-only. |
-| Idle GPU | The dev `llama-server` on `127.0.0.1:11436` (serves `opencode`, holds ~22 GiB VRAM) **must be stopped** before a real sweep. |
+| Models & builds | The pinned llama.cpp builds and all 5 GGUF models are already on disk (see [env.md](env.md)). No downloads. |
+| Python for the driver | Must import **PyYAML** (only `run_sweep.py` needs it — to parse `matrix.yaml`). On the reference machine use **`/usr/bin/python3`** (system python, has PyYAML). A `python3` on `PATH` that points at a venv without PyYAML will be refused with an install hint. The two helpers (`sampler.py`, `ttft_probe.py`) are stdlib-only. |
+| Idle GPU | Any running `llama-server` holding VRAM **must be stopped** before a real sweep (see §2). |
 
 Install the one dependency if you ever need a different python:
 
@@ -32,11 +24,11 @@ Install the one dependency if you ever need a different python:
 pip install -r requirements.txt     # PyYAML>=6.0
 ```
 
-## 2. Stop the dev server (do this first)
+## 2. Free the GPU (do this first)
 
 ```
-# find it (it is the llama-server on :11436)
-pgrep -af 'llama-server.*11436'
+# find any running llama-server
+pgrep -af llama-server
 kill <pid>                          # SIGTERM; it should release cleanly
 
 # wait ~10s, then confirm it released VRAM + settled:
@@ -58,7 +50,7 @@ a "CONTAMINATED" warning and stamps `forced: true` into `run.json` (that's how t
 ## 3. Run a sweep
 
 ```
-cd ~/projects/local-llm-benchmarks
+cd local-llm-benchmarks
 
 # Full sweep of all 5 cells, one backend each:
 /usr/bin/python3 scripts/run_sweep.py --backend vulkan
@@ -72,7 +64,8 @@ cd ~/projects/local-llm-benchmarks
 /usr/bin/python3 scripts/run_sweep.py --consolidate
 ```
 
-Options (from `--help`):
+Options (from `--help`). Run-parameter defaults come from `matrix.yaml` `defaults`
+(single source of truth); the flags below override them per run.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -83,9 +76,23 @@ Options (from `--help`):
 | `--tg-tokens N` | `512` | generation length (both bench and probe) |
 | `--port N` | `11500` | local `llama-server` port (binds 127.0.0.1) |
 | `--ctx N` | `8192` | server context size (see caveat in §7) |
+| `--threads N` | `16` (`threads_cpu`) | CPU threads for `llama-bench` / `llama-server` |
+| `--ngl N` | `99` (`gpu_layers: all`) | GPU layers (`-ngl`); matrix `all` → 99 |
+| `--warmup N` | `1` (`warmup_requests`) | untimed warmup requests before the timed TTFT probe |
+| `--power-hz N` | `5` (`power_sample_hz`) | resource sampler rate (Hz) |
 | `--force` | off | skip the idle gate (results flagged contaminated) |
 | `--rocm-override` | off | set `HSA_OVERRIDE_GFX_VERSION=11.5.0` (gfx1151 fallback, see §7) |
 | `--consolidate` | off | rebuild `consolidated.csv` + `table.md` from existing run dirs and exit; no GPU, no `--backend` needed |
+
+## 3b. Run the tests
+
+The harness has a small stdlib-`unittest` suite (no pytest dependency) covering the
+`llama-bench` table parser, `consolidate()` idempotency (no duplicate rows) and the
+`matrix.yaml`-defaults wiring. Run it with the same python as the driver:
+
+```
+/usr/bin/python3 -m unittest discover -s tests -v
+```
 
 ## 4. What the driver does per cell
 
@@ -155,8 +162,8 @@ records `forced: true`).
 
 ## 7. Caveats (read before trusting a number)
 
-- **CPU power state is a measurement condition, and it is deliberately not pinned.** This box
-  runs `amd_pstate=active` with governor `powersave`, EPP `balance_performance` and no power
+- **CPU power state is a measurement condition, and it is deliberately not pinned.** The
+  reference machine runs `amd_pstate=active` with governor `powersave`, EPP `balance_performance` and no power
   daemon (decision 2026-10-02: leave the default, record it — see
   [env.md](env.md#cpu-power-state-measurement-condition)). `run.json.cpu_power` stamps what
   each run measured under, so a run taken after a profile change is spotted rather than
@@ -185,15 +192,14 @@ records `forced: true`).
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets
   `HSA_OVERRIDE_GFX_VERSION=11.5.0`); if it still fails, treat ROCm as a bonus axis per PLAN.
-- **Throttling is data, not a failure.** Sustained 59 GB loads can heat the box; `temp_c_max`
+- **Throttling is data, not a failure.** Sustained 59 GB loads can heat the APU; `temp_c_max`
   and the power trace are logged so a throttled run is still a *reported* run — just read the
   sustained (not burst) tok/s.
 
 ## 8. Recording a run (reproducibility — manual for now)
 
-The driver does **not** yet auto-commit/tag (tracked as M8 in REVIEW.md; PLAN §3 calls for
-"git commit + tag `run-YYYYMMDD-N`" per sweep). Until that lands, do it by hand after a
-successful sweep:
+The driver does **not** yet auto-commit/tag a run (an open item — see
+[REVIEW.md](../REVIEW.md)). Until that lands, do it by hand after a successful sweep:
 
 ```
 git add results/ && git commit -m "run: $(ls -1t results | head -1)" \

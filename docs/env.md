@@ -1,6 +1,6 @@
 # Environment fingerprint
 
-Verified 2026-09-30 on the target machine (this box is the hardware under test).
+Verified 2026-09-30 on the reference machine (the hardware under test).
 
 | Item | Value |
 |---|---|
@@ -49,5 +49,5 @@ this state (it has not changed since), but only from 2026-10-02 is it recorded i
 run metadata itself.
 
 ## Contention
-- A `llama-server` runs on 127.0.0.1:11436 (Qwen3.8-27B + MTP, serves `opencode`, ~23.5 GB VRAM).
-  **Stop it before sweeps**; the driver must verify the GPU is idle before each cell.
+- A long-running `llama-server` can hold ~23 GB of VRAM. **Stop any such server before
+  sweeps**; the driver verifies the GPU is idle before each cell and refuses to start otherwise.

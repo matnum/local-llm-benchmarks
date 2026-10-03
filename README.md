@@ -199,22 +199,28 @@ GGUF files and llama.cpp build, then follow [docs/RUNNING.md](docs/RUNNING.md).
 
 - **Quality eval set** (EN/FI): a small version-controlled set — strict-JSON
   extraction, function-calling, summarization, a GSM8K-style math subset, plus
-  Finnish summarization/extraction/translation/chat — scored against the five
-  local models.
+  Finnish summarization/extraction/translation/chat — scored across the eleven
+  cells benchmarked here. Still the biggest gap: everything measured so far is
+  throughput, not capability.
 - **Embeddings:** bge-m3 vs nomic-embed-text on a Finnish retrieval set (decides
-  the Finnish RAG stack) — deferred until downloads are unblocked.
-- **Wider matrix** — the cells below need downloads and an HF token for the gated
-  repos.
+  the Finnish RAG stack). The download block is gone as of 2026-10-03; not yet run.
+- **Vulkan TTFT spread** — an open finding, not a harness bug: on Vulkan the first
+  timed request is much faster than the next two (see `docs/RUNNING.md` §7). Worth
+  one experiment to tell prompt-cache reuse from a per-request Vulkan cost.
+- **Wider matrix** — the cells below still need a one-time download. The 2026-10-03
+  round already swept five of the originally-planned set (Qwen3-4B Q8_0,
+  Qwen3-32B Q5_K_M, plus the Finnish/EU Poro 2 8B, EuroLLM-9B and Poro 2 70B).
 
-### Future cells (needs download + HF token — not in the current run)
+### Future cells (one-time download)
+
+Every GGUF repo used so far was ungated, so the HF token that earlier versions of
+this list assumed turned out not to be needed; check per-repo for the ones below.
 
 | Tier | Model | Quant | Size (approx) |
 |---|---|---|---|
 | Small / routing | gpt-oss-20b (MoE) | native MXFP4 | ~13 GB |
 | Small / routing | Qwen3-30B-A3B (MoE) | Q4_K_M | ~18 GB |
-| Tiny | Qwen3-4B / Phi-4-mini 3.8B | Q8_0 | ~4–5 GB |
 | Mid | Llama 3.1 8B | Q8_0 | ~8.5 GB |
-| Mid | Qwen3-32B | Q5_K_M | ~20 GB |
 | Mid | Mistral Small 3.2 24B | Q4_K_M | ~15 GB |
 | Mid | Gemma 3 27B | Q4_K_M | ~17 GB |
 | Big | Llama 3.3 70B | Q4_K_M | ~42 GB |

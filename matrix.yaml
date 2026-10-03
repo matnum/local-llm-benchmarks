@@ -1,5 +1,7 @@
-# Frozen benchmark matrix — ON-DISK models only (decision D1: no downloads).
-# Sizes are the exact GGUF files in ~/.local/share/models/ (verified 2026-09-30).
+# Frozen benchmark matrix — GGUF files in ~/.local/share/models/ (decision D1).
+# Sizes are the exact GGUF files (verified on-disk 2026-09-30 for the original
+# five). The "next round" cells (tiny/small/mid/big dense, below) need a one-time
+# wget download before they can be swept.
 # Bench params are per-cell overridable; `defaults` below are the sweep standard.
 # `defaults` is the single source of truth for run parameters: run_sweep.py's
 # build_parser() reads it to set the argparse defaults, so editing a value here
@@ -59,3 +61,49 @@ cells:
     file: ~/.local/share/models/qwen3.8-27b/Qwen3.8-27B-UD-Q6_K.gguf
     size_gib: 20.5
     note: quant-pair row (vs qwen3.8-27b-q5_k_xl)
+
+  # --- next round (download first; wget commands are one-time) ---
+  - id: qwen3-4b-q8_0
+    tier: tiny
+    model: Qwen3-4B
+    arch: dense
+    quant: Q8_0
+    file: ~/.local/share/models/Qwen3-4B-Q8_0.gguf
+    size_gib: 4.0
+    note: routing/tiny tier; Apache-2.0, ungated
+
+  - id: poro2-8b-q8_0
+    tier: small
+    model: Poro 2 8B
+    arch: dense
+    quant: Q8_0
+    file: ~/.local/share/models/Llama-Poro-2-8B-Instruct.Q8_0.gguf
+    size_gib: 8.0
+    note: Finnish + English small tier; Llama 3.1 Community License, ungated
+
+  - id: eurollm-9b-q8_0
+    tier: small
+    model: EuroLLM-9B-Instruct
+    arch: dense
+    quant: Q8_0
+    file: ~/.local/share/models/EuroLLM-9B-Instruct-Q8_0.gguf
+    size_gib: 9.1
+    note: European languages incl. Finnish; Apache-2.0, ungated
+
+  - id: qwen3-32b-q5_k_m
+    tier: mid
+    model: Qwen3-32B
+    arch: dense
+    quant: Q5_K_M
+    file: ~/.local/share/models/Qwen3-32B-Q5_K_M.gguf
+    size_gib: 21.6
+    note: dense control (Qwen family); Apache-2.0, ungated
+
+  - id: poro2-70b-q4_k_m
+    tier: big
+    model: Poro 2 70B
+    arch: dense
+    quant: Q4_K_M
+    file: ~/.local/share/models/Llama-Poro-2-70B-Instruct.Q4_K_M.gguf
+    size_gib: 39.6
+    note: Finnish quality + dense ceiling; Llama 3.1 Community License, ungated

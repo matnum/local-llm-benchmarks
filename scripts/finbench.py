@@ -383,13 +383,18 @@ def consolidate(run_id):
            + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns)) + ".", "",
            "| model | " + " | ".join(tasks) + " | mean acc |",
            "|---" * (len(tasks) + 2) + "|"]
+    # ranked by mean acc — a capability table is read as a ranking, and the
+    # alphabetical order (as cell ids happen to be named) hides exactly that.
+    ranked = []
     for cell in models:
         vals = {r["task"]: r for r in rows if r["cell"] == cell}
         accs = [vals[t]["acc"] for t in tasks if t in vals]
+        ranked.append((sum(accs) / len(accs), cell, vals))
+    for mean, cell, vals in sorted(ranked, reverse=True):
         md.append(f"| {cell} | " + " | ".join(
             f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
             for t in tasks)
-            + f" | {sum(accs) / len(accs):.3f} |")
+            + f" | {mean:.3f} |")
     open(f"{RESULTS}/finbench-table.md", "w", encoding="utf-8").write("\n".join(md) + "\n")
     print(f"\nwrote {path} and {RESULTS}/finbench-table.md")
 

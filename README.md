@@ -146,6 +146,45 @@ Poro 2 70B (39.6 GiB, Q4_K_M) reaches 5.27 t/s against 6.46 t/s (82%, inside the
 as every other dense cell), and Qwen3-4B Q8_0 is the efficiency leader at 0.57 tok/s/W.
 The 70B is also the hottest cell measured — 89 °C on ROCm against 82 °C on Vulkan.
 
+## Finnish capability — FIN-bench-v2 (`cf` / `p0`)
+
+Throughput says nothing about whether a model writes good Finnish. This is the official
+[FIN-bench-v2](https://huggingface.co/datasets/TurkuNLP/FIN-bench) suite, run on the pinned
+llama.cpp build by `tools/score_ll` + `scripts/finbench.py` (see
+[docs/RUNNING.md](docs/RUNNING.md#9-finnish-capability-axis--fin-bench-v2-cf--p0) for why it
+needs its own scorer). Four models × the five task families that have a `cf` variant × prompt
+variant `p0`, zero-shot — 7,296 items per model, all of them scored: no skips, no context
+overflows, no unusable gold indices.
+
+Cells are **acc / acc_norm**; `acc_norm` divides the choice loglikelihood by its character
+length, exactly as the harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
+
+| model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
+|---|---|---|---|---|---|---|
+| poro2-70b-q4_k_m | 0.455 / 0.486 | 0.570 / 0.470 | 0.649 / 0.714 | 0.954 / 0.954 | 0.518 / 0.435 | **0.629** |
+| eurollm-9b-q8_0 | 0.421 / 0.445 | 0.537 / 0.471 | 0.521 / 0.587 | 0.944 / 0.944 | 0.596 / 0.567 | 0.604 |
+| poro2-8b-q8_0 | 0.396 / 0.420 | 0.469 / 0.417 | 0.587 / 0.638 | 0.942 / 0.942 | 0.356 / 0.263 | 0.550 |
+| qwen3-8b-q4_k_m | 0.310 / 0.364 | 0.434 / 0.410 | 0.389 / 0.344 | 0.499 / 0.499 | 0.515 / 0.611 | 0.430 |
+
+Three things stand out:
+
+- **Finnish adaptation buys a lot at equal size.** Poro 2 8B beats the English-centric Qwen3-8B
+  by 12 points of mean acc (0.550 vs 0.430), winning four of five tasks: +8.6 pts on arc_c,
+  +19.8 on goldenswag, +44.3 on scandisent.
+- **Sentiment is a cliff, not a gradient.** Qwen3-8B scores 0.499 on a binary task — exactly
+  chance — where every Finnish-capable model is at ~0.94. It cannot produce
+  "positiivinen"/"negatiivinen" as continuations at all.
+- **The Finnish-specific model loses topic classification.** sib200 is the one task where
+  Poro 2 8B (0.356) trails Qwen3-8B (0.515); the 70B (0.518) only ties it, while the generalist
+  EuroLLM-9B leads at 0.596. Finnish adaptation is not uniformly better — and EuroLLM-9B also
+  beats both Finnish-focused models on mean acc.
+
+Caveats before quoting these: the quantisations are **not matched** (Qwen3-8B is Q4_K_M, the
+others Q8_0 — plausibly worth 1–2 points, not 12); this is the `cf` formulation at one prompt
+variant, so it is not comparable with published FIN-bench tables (the paper notes formulation
+effects, singling out Poro 2 70B as strong in CF specifically); and GPU-vs-CPU logprob numerics
+differ by up to ~0.12, harmless for a task score but able to flip a near-tie.
+
 ## Running it
 
 Prerequisites, commands, and per-cell behavior: [docs/RUNNING.md](docs/RUNNING.md).
@@ -197,11 +236,12 @@ GGUF files and llama.cpp build, then follow [docs/RUNNING.md](docs/RUNNING.md).
 
 ## Roadmap
 
-- **Quality eval set** (EN/FI): a small version-controlled set — strict-JSON
-  extraction, function-calling, summarization, a GSM8K-style math subset, plus
-  Finnish summarization/extraction/translation/chat — scored across the eleven
-  cells benchmarked here. Still the biggest gap: everything measured so far is
-  throughput, not capability.
+- **Finnish capability — done for the `cf` formulation** (see
+  [Finnish capability](#finnish-capability--fin-bench-v2-cf--p0) above). Extending it means the
+  `mcf` formulation and prompt variants `p1`–`p4`: the harness publishes five variants per task,
+  and formulation is known to move scores.
+- **English / general quality eval set** — still the gap: strict-JSON extraction,
+  function-calling and a GSM8K-style math subset, scored across the models benchmarked here.
 - **Embeddings:** bge-m3 vs nomic-embed-text on a Finnish retrieval set (decides
   the Finnish RAG stack). The download block is gone as of 2026-10-03; not yet run.
 - **Vulkan TTFT spread** — an open finding, not a harness bug: on Vulkan the first

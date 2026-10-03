@@ -208,3 +208,25 @@ run-20261003-1556,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,power_w_bench,W,84.7,max 
 run-20261003-1556,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,temp_c_max,C,91.0,
 run-20261003-1556,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,vram_peak_gib,GiB,5.06,
 run-20261003-1556,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tok_per_w,t/s/W,0.53,server tg / probe W mean
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp512_bench_tps,t/s,127.04,"llama-bench mean of 3, sd ±3.31"
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp2048_bench_tps,t/s,117.92,"llama-bench mean of 3, sd ±0.18"
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg512_bench_tps,t/s,5.27,"llama-bench mean of 3, sd ±0.0"
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg_server_tps,t/s,5.24,"streaming, mean of 3"
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms,ms,354.6,mean of 3
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms_p50,ms,199.6,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_probe,W,85.1,max 95.5
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_bench,W,82.0,max 116.2
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,temp_c_max,C,82.0,
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,vram_peak_gib,GiB,40.72,
+run-20261003-1718,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tok_per_w,t/s/W,0.06,server tg / probe W mean
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp512_bench_tps,t/s,133.16,"llama-bench mean of 3, sd ±1.23"
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp2048_bench_tps,t/s,131.16,"llama-bench mean of 3, sd ±0.13"
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg512_bench_tps,t/s,5.15,"llama-bench mean of 3, sd ±0.0"
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg_server_tps,t/s,5.1,"streaming, mean of 3"
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms,ms,210.1,mean of 3
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms_p50,ms,200.3,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_probe,W,85.2,max 116.2
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_bench,W,82.4,max 116.0
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,temp_c_max,C,89.0,
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,vram_peak_gib,GiB,41.02,
+run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tok_per_w,t/s/W,0.06,server tg / probe W mean

@@ -94,11 +94,12 @@ to 88 °C vs 85 °C).
 
 ### Charts
 
-All nine measured cells, both backends, ordered by model size (small → large). Each row
-is one model with its Vulkan and ROCm results joined by a line, so the pair *and the size
-of the gap* read directly. On the generation chart the dense-model bandwidth ceiling
+All ten measured cells, both backends, ordered by model size (small → large). Each row is
+one model with its Vulkan and ROCm results joined by a line, so the pair *and the size of
+the gap* read directly. On the generation chart the dense-model bandwidth ceiling
 (256 GB/s ÷ model size) is marked ✕ where it applies — every dense cell lands at 77–85% of
-it, while the MoE cells clear it outright, which is the MoE advantage in one line:
+it, including the 39.6 GiB Poro 2 70B at 82%, while the MoE cells clear it outright, which
+is the MoE advantage in one line:
 
 ![Generation throughput — tg512 (tok/s)](charts/generation_tps.png)
 
@@ -107,8 +108,8 @@ it, while the MoE cells clear it outright, which is the MoE advantage in one lin
 ![Generation efficiency — tokens per watt](charts/tokens_per_watt.png)
 
 The backend split as a single picture — bars are ROCm relative to Vulkan, so positive is
-ROCm faster and negative Vulkan faster. Across all nine cells it is unanimous: **Vulkan
-wins generation in 9 of 9 (ROCm trails by 1.7–15.5%) and ROCm wins prefill in 9 of 9 (by
+ROCm faster and negative Vulkan faster. Across all ten cells it is unanimous: **Vulkan wins
+generation in 10 of 10 (ROCm trails by 1.7–15.5%) and ROCm wins prefill in 10 of 10 (by
 2.0–24.5%)** — the MoE 30–35B cells show by far the widest prefill gap:
 
 ![Backend difference — ROCm vs Vulkan](charts/backend_delta.png)
@@ -134,13 +135,16 @@ are in [results/table.md](results/table.md).
 | qwen3-32b-q5_k_m | Q5_K_M | rocm | 306.88 | 9.47 | 9.31 | 113.2 | 0.11 | 22.79 |
 | qwen3-4b-q8_0 | Q8_0 | vulkan | 2056.79 | 49.1 | 47.69 | 27.7 | 0.57 | 4.81 |
 | qwen3-4b-q8_0 | Q8_0 | rocm | 2392.52 | 46.83 | 44.97 | 24.4 | 0.53 | 5.06 |
+| poro2-70b-q4_k_m | Q4_K_M | vulkan | 117.92 | 5.27 | 5.24 | 199.6 | 0.06 | 40.72 |
+| poro2-70b-q4_k_m | Q4_K_M | rocm | 131.16 | 5.15 | 5.1 | 200.3 | 0.06 | 41.02 |
 
-**The same split reproduces on all four.** Vulkan is faster on `tg512` in 4 of 4 cells
-(ROCm trails by 1.8–4.6%), ROCm is faster on `pp2048` in 4 of 4 (by 16.0–24.5%) — the
-direction held across a different size range, from a 4B tiny cell to a 32B dense one.
-Rates scale with size as expected: Poro 2 8B (8 GiB, Q8_0) reaches 27.1 t/s on Vulkan
-against a ~32 t/s bandwidth ceiling, and Qwen3-4B Q8_0 is the efficiency leader of this
-round at 0.57 tok/s/W.
+**The same split reproduces on all five.** Vulkan is faster on `tg512` in 5 of 5 cells
+(ROCm trails by 1.8–4.6%), ROCm is faster on `pp2048` in 5 of 5 (by 11.2–24.5%) — the
+direction held from a 4B tiny cell to a 39.6 GiB 70B. Rates scale with size as expected:
+Poro 2 8B (8 GiB, Q8_0) reaches 27.1 t/s on Vulkan against a ~32 t/s bandwidth ceiling,
+Poro 2 70B (39.6 GiB, Q4_K_M) reaches 5.27 t/s against 6.46 t/s (82%, inside the same band
+as every other dense cell), and Qwen3-4B Q8_0 is the efficiency leader at 0.57 tok/s/W.
+The 70B is also the hottest cell measured — 89 °C on ROCm against 82 °C on Vulkan.
 
 ## Running it
 

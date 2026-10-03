@@ -92,6 +92,20 @@ to 88 °C vs 85 °C).
 > the first timed request is much faster than the next two, so the mean alone is
 > misleading — this table shows the median, and `table.md` prints both.
 
+### Charts
+
+The MoE models (a few billion *active* parameters) are ~5–7× faster at generation
+and ~5–8× more efficient per watt than the dense 27B models:
+
+![Generation throughput — tg512 (tok/s)](charts/generation_tps.png)
+
+![Prompt processing — pp2048 (tok/s)](charts/prefill_tps.png)
+
+![Generation efficiency — tokens per watt](charts/tokens_per_watt.png)
+
+*Generated from `results/consolidated.csv` by `scripts/make_charts.py` (Vulkan =
+blue, ROCm = orange).*
+
 ## Running it
 
 Prerequisites, commands, and per-cell behavior: [docs/RUNNING.md](docs/RUNNING.md).
@@ -133,6 +147,7 @@ GGUF files and llama.cpp build, then follow [docs/RUNNING.md](docs/RUNNING.md).
 |---|---|
 | `scripts/run_sweep.py` | one-command sweep driver (stdlib + PyYAML) |
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib-only helpers (power/trace, TTFT probe) |
+| `scripts/make_charts.py` | regenerates the README charts from the rollup (needs matplotlib) |
 | `matrix.yaml` | benchmark matrix + run-parameter defaults |
 | `docs/RUNNING.md` | operator guide |
 | `docs/env.md` | machine fingerprint |

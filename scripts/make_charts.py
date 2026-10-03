@@ -86,6 +86,13 @@ def row_label(cell, meta):
     return f"{name}\n{' · '.join(bits)}" + (f"\n{tier}" if tier in ("moe", "dense") else "")
 
 
+# The two backends sit slightly above/below the row centre. Without the offset a
+# coincident pair (Poro 2 8B is 0.31 tok/s/W on both backends; Qwen3-32B 0.11 on
+# both) is drawn one dot on top of the other and the lower series disappears —
+# which reads as "only one backend was measured".
+ROW_OFFSET = 0.13
+
+
 def dumbbell(ax, vals, cells, meta, metric, fmt):
     """One row per model: Vulkan and ROCm dots joined, values printed per row."""
     y = np.arange(len(cells))
@@ -93,15 +100,14 @@ def dumbbell(ax, vals, cells, meta, metric, fmt):
         pair = [(b, vals[(cell, b)][metric]) for b in BACKENDS if metric in vals.get((cell, b), {})]
         if len(pair) < 2:
             continue
-        xs = [v for _, v in pair]
-        ax.plot([min(xs), max(xs)], [i, i], color="#999999", lw=2.2, zorder=2,
-                solid_capstyle="round")
-        for b, v in pair:
-            ax.scatter([v], [i], s=52, color=COLORS[b], zorder=3,
+        pts = [(v, i + (ROW_OFFSET if b == "vulkan" else -ROW_OFFSET)) for b, v in pair]
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color="#999999", lw=2.0,
+                zorder=2, solid_capstyle="round")
+        for (v, yy), (b, _) in zip(pts, pair):
+            ax.scatter([v], [yy], s=50, color=COLORS[b], zorder=3,
                        label=LABELS[b] if i == 0 else None, edgecolor="white", linewidth=0.8)
-        v_r = vals[(cell, "rocm")].get(metric)
-        v_v = vals[(cell, "vulkan")].get(metric)
-        ax.annotate(f"V {fmt % v_v} · R {fmt % v_r}", (max(xs), i),
+        xs = [v for _, v in pair]
+        ax.annotate(f"V {fmt % pair[0][1]} · R {fmt % pair[1][1]}", (max(xs), i),
                     textcoords="offset points", xytext=(7, -3), fontsize=7.5,
                     color="#444444")
 
@@ -113,8 +119,8 @@ def dumbbell(ax, vals, cells, meta, metric, fmt):
         size = meta[cell].get("size_gib")
         if not size:
             continue
-        ax.scatter([CEILING_BW / size], [i], marker="x", s=46, color=CEILING_COLOR,
-                   zorder=4, linewidths=1.8,
+        ax.scatter([CEILING_BW / size], [i + ROW_OFFSET], marker="x", s=46,
+                   color=CEILING_COLOR, zorder=4, linewidths=1.8,
                    label="dense ceiling (256 GB/s ÷ size)" if first else None)
         first = False
 

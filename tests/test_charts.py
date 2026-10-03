@@ -72,6 +72,24 @@ class ChartDataTest(unittest.TestCase):
                     self.assertIn(metric, self.vals[(cell, backend)],
                                   f"{cell}/{backend} lacks {metric}")
 
+    def test_coincident_backends_are_not_drawn_on_top_of_each_other(self):
+        """Equal values must not hide a series.
+
+        Poro 2 8B measures 0.31 tok/s/W on both backends and Qwen3-32B 0.11 on
+        both; with both dots on the row centre the upper one vanished and the
+        chart read as if only one backend had been measured.
+        """
+        import matplotlib.pyplot as plt
+
+        vals = {("c", "vulkan"): {"m": 1.0}, ("c", "rocm"): {"m": 1.0}}
+        meta = {"c": {"model": "x", "quant": "q", "size_gib": 1.0, "arch": "moe"}}
+        fig, ax = plt.subplots()
+        make_charts.dumbbell(ax, vals, ["c"], meta, "m", "%.2f")
+        ys = {round(float(off[1]), 3) for coll in ax.collections
+              for off in coll.get_offsets()}
+        plt.close(fig)
+        self.assertEqual(len(ys), 2, f"both backends drawn at one y: {ys}")
+
     def test_main_writes_all_charts_as_real_pngs(self):
         """End-to-end, into a temp dir so the tracked PNGs are never touched."""
         with tempfile.TemporaryDirectory() as tmp:

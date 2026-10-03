@@ -106,6 +106,30 @@ and ~5–8× more efficient per watt than the dense 27B models:
 *Generated from `results/consolidated.csv` by `scripts/make_charts.py` (Vulkan =
 blue, ROCm = orange).*
 
+### Next-round cells (2026-10-03)
+
+Four downloaded models added to `matrix.yaml` as the next-round cells, swept the same
+way. The charts above cover the five headline cells of 2026-10-02; these are tabulated
+here and in [results/table.md](results/table.md).
+
+| Cell | Quant | Backend | pp2048 t/s | tg512 bench t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |
+|---|---|---|---|---|---|---|---|---|
+| poro2-8b-q8_0 | Q8_0 | vulkan | 1025.83 | 27.13 | 26.61 | 234.3 | 0.31 | 8.21 |
+| poro2-8b-q8_0 | Q8_0 | rocm | 1277.2 | 26.65 | 26.16 | 41.9 | 0.31 | 8.47 |
+| eurollm-9b-q8_0 | Q8_0 | vulkan | 911.37 | 23.54 | 23.06 | 48.7 | 0.27 | 9.48 |
+| eurollm-9b-q8_0 | Q8_0 | rocm | 1089.07 | 23.02 | 22.57 | 47.2 | 0.26 | 9.74 |
+| qwen3-32b-q5_k_m | Q5_K_M | vulkan | 264.51 | 9.71 | 9.64 | 471.9 | 0.11 | 22.52 |
+| qwen3-32b-q5_k_m | Q5_K_M | rocm | 306.88 | 9.47 | 9.31 | 113.2 | 0.11 | 22.79 |
+| qwen3-4b-q8_0 | Q8_0 | vulkan | 2056.79 | 49.1 | 47.69 | 27.7 | 0.57 | 4.81 |
+| qwen3-4b-q8_0 | Q8_0 | rocm | 2392.52 | 46.83 | 44.97 | 24.4 | 0.53 | 5.06 |
+
+**The same split reproduces on all four.** Vulkan is faster on `tg512` in 4 of 4 cells
+(ROCm trails by 1.8–4.6%), ROCm is faster on `pp2048` in 4 of 4 (by 16.0–24.5%) — the
+direction held across a different size range, from a 4B tiny cell to a 32B dense one.
+Rates scale with size as expected: Poro 2 8B (8 GiB, Q8_0) reaches 27.1 t/s on Vulkan
+against a ~32 t/s bandwidth ceiling, and Qwen3-4B Q8_0 is the efficiency leader of this
+round at 0.57 tok/s/W.
+
 ## Running it
 
 Prerequisites, commands, and per-cell behavior: [docs/RUNNING.md](docs/RUNNING.md).

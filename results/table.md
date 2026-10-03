@@ -1,6 +1,6 @@
 # Results
 
-> Rollup built by harness `e90dfd198931`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.
+> Rollup built by harness `0f7ca5cea5bf`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.
 
 ## run-20261002-1719 — rocm
 
@@ -27,3 +27,21 @@
 | qwen3.5-35b-a3b-q6_k | Q6_K | 1140.08 | 52.82 | 50.8 | 57.9 | 58.1 | 85.5 | 0.59 | 27.46 |
 | qwen3.8-27b-q5_k_xl | Q5_K_XL | 339.18 | 10.35 | 10.23 | 155.9 | 137.3 | 85.2 | 0.12 | 19.65 |
 | qwen3.8-27b-q6_k | Q6_K | 336.27 | 9.84 | 9.73 | 155.7 | 150.0 | 85.4 | 0.11 | 20.59 |
+
+## run-20261003-1543 — vulkan
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | 911.37 | 23.54 | 23.06 | 130.2 | 48.7 | 85.1 | 0.27 | 9.48 |
+| poro2-8b-q8_0 | Q8_0 | 1025.83 | 27.13 | 26.61 | 169.6 | 234.3 | 84.7 | 0.31 | 8.21 |
+| qwen3-32b-q5_k_m | Q5_K_M | 264.51 | 9.71 | 9.64 | 350.7 | 471.9 | 85.0 | 0.11 | 22.52 |
+| qwen3-4b-q8_0 | Q8_0 | 2056.79 | 49.1 | 47.69 | 92.9 | 27.7 | 83.5 | 0.57 | 4.81 |
+
+## run-20261003-1556 — rocm
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | 1089.07 | 23.02 | 22.57 | 50.5 | 47.2 | 85.2 | 0.26 | 9.74 |
+| poro2-8b-q8_0 | Q8_0 | 1277.2 | 26.65 | 26.16 | 43.0 | 41.9 | 85.2 | 0.31 | 8.47 |
+| qwen3-32b-q5_k_m | Q5_K_M | 306.88 | 9.47 | 9.31 | 118.3 | 113.2 | 85.3 | 0.11 | 22.79 |
+| qwen3-4b-q8_0 | Q8_0 | 2392.52 | 46.83 | 44.97 | 26.0 | 24.4 | 85.2 | 0.53 | 5.06 |

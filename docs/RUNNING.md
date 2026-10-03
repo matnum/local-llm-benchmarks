@@ -206,6 +206,64 @@ git add results/ && git commit -m "run: $(ls -1t results | head -1)" \
   && git tag run-$(date +%Y%m%d)-<n>
 ```
 
-Also, for controlled conditions: pin the CPU governor before the sweep
-(`cpupower frequency-set -g performance`), and record the llama.cpp commit (it's already in
-`run.json` → `llama_cpp_commit`) and the [env.md](env.md) fingerprint.
+CPU power state: the governor is deliberately **not** pinned — the runs are meant to describe
+the box as it actually behaves, and `run.json` → `cpu_power` records the governor/EPP each run
+measured under (see [env.md](env.md#cpu-power-state-measurement-condition)). The llama.cpp
+commit is in `run.json` → `llama_cpp_commit`, the harness revision in `harness_commit`, and the
+[env.md](env.md) fingerprint holds the rest.
+
+## 9. Finnish capability axis — FIN-bench-v2 (`cf` / `p0`)
+
+The sweeps above measure throughput; they say nothing about whether a model writes good
+Finnish. That is measured separately with the official FIN-bench-v2 suite, driven by
+`scripts/finbench.py`.
+
+**Why it needs its own scorer.** Every multiple-choice task in FIN-bench-v2 is scored by the
+loglikelihood of the *full choice text as a continuation* (`doc_to_choice: "{{ choices.text }}"`,
+metrics `acc` + `acc_norm`). The pinned llama-server cannot produce those numbers: it refuses
+`echo` outright (`tools/server/server-common.cpp`: *"Only no echo is supported"*), the native
+`/completion` returns next-token probabilities only (measured: 1 `completion_probabilities`
+entry for 22 evaluated prompt tokens), and the OpenAI-format `logprobs` caps at 20 alternatives.
+The harness fork's `gguf` model backend is no help either — it expects the older
+`text_offset` / `token_logprobs` response shape. So `tools/score_ll.cpp` links against the
+pinned build's own `libllama` and computes the loglikelihoods directly.
+
+Build (no new dependencies — the pinned build already ships `libllama.so` and `include/llama.h`):
+
+```
+L=~/.local/opt/llama.cpp
+g++ -O2 -std=c++17 -I$L/include -I$L/ggml/include tools/score_ll.cpp \
+  -L$L/build/bin -lllama -lggml -lggml-base -Wl,-rpath,$L/build/bin -o tools/score_ll
+```
+
+Run (`scripts/finbench.py` stays stdlib + PyYAML; data comes from the HF datasets-server REST
+API and is cached resumably under `~/.cache/finbench/`):
+
+```
+/usr/bin/python3 scripts/finbench.py --list
+/usr/bin/python3 scripts/finbench.py --model poro2-8b-q8_0 --pilot 150   # fast pipeline check
+/usr/bin/python3 scripts/finbench.py --model <cell> --run-id <id>
+/usr/bin/python3 scripts/finbench.py --consolidate-only --run-id <id>
+```
+
+**Scope:** the five families that have a `cf` variant — `arc_c`, `belebele_fin`, `goldenswag`,
+`scandisent`, `sib200` — at prompt variant `p0`, zero-shot: 7,296 items. `squad_fi` and
+`truthfulqa` exist upstream only as `gen`/`mc1`/`mc2`, so a cf-only run excludes them by
+construction rather than by omission. Per-task detail lands in
+`results/finbench-<run>/<cell>/<task>.json` (gitignored); the rollups
+`results/finbench-consolidated.csv` and `results/finbench-table.md` are tracked.
+
+Metrics are the harness's own (`lm_eval/api/task.py`, `OUTPUT_TYPE == "multiple_choice"`):
+`acc` = argmax of the summed choice loglikelihood; `acc_norm` = argmax of the loglikelihood
+divided by the choice's **character** length.
+
+Two caveats before quoting a number:
+
+- **GPU and CPU numerics differ slightly.** Validated against the server's own next-token
+  logprobs on CPU: agreement to ~3e-4 (` Su` -0.157315 vs -0.1571; ` Helsinki` -3.524064 vs
+  -3.5238). On GPU the two implementations diverge by up to ~0.12 in logprob, because batch
+  shapes and kernels differ — harmless for a task score, but a near-tie between two choices
+  could flip. The whole axis runs one way (GPU, no `--fa`), so the numbers are internally
+  consistent.
+- **Not a drop-in lm-eval number.** Prompts, datasets and metric definitions match the fork;
+  the scoring engine does not. Comparable-with-a-caveat, not leaderboard-submittable.

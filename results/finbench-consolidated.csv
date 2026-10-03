@@ -1,0 +1,6 @@
+run_id,cell,task,n,acc,acc_norm
+pilot,poro2-8b-q8_0,arc_c,150,0.34,0.4133
+pilot,poro2-8b-q8_0,belebele_fin,150,0.4,0.42
+pilot,poro2-8b-q8_0,goldenswag,150,0.5733,0.6333
+pilot,poro2-8b-q8_0,scandisent,150,0.9467,0.9467
+pilot,poro2-8b-q8_0,sib200,150,0.34,0.3

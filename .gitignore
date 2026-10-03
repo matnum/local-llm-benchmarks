@@ -9,6 +9,12 @@ results/run-*/
 # from consolidate()'s results/run-*/ glob, so they can never enter the rollup
 results/superseded-*/
 
+# compiled loglikelihood scorer for the FIN-bench axis (build from tools/score_ll.cpp)
+tools/score_ll
+
+# per-run FIN-bench detail (finbench-consolidated.csv + finbench-table.md stay tracked)
+results/finbench-*/
+
 # misc
 __pycache__/
 *.pyc

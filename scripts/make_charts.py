@@ -2,16 +2,27 @@
 """Generate the README charts from results/consolidated.csv.
 
 Reads the tracked rollup and writes PNGs to charts/. Re-run after any
-`--consolidate` to refresh the figures. Requires matplotlib (not part of the
-benchmark harness itself, which stays stdlib + PyYAML).
+`--consolidate` to refresh the figures. Requires matplotlib and PyYAML (neither
+is part of the benchmark harness itself, which stays stdlib + PyYAML).
 
 For each (cell, backend) the latest run_id wins, so the early 1-cell smoke
-(run-…-1719, ROCm) is superseded by the full ROCm sweep (run-…-1751) — this
-matches the headline table in the README.
+(run-…-1719, ROCm) is superseded by the full ROCm sweep (run-…-1751).
+
+Design notes — why dumbbells rather than grouped bars:
+  * one row per model, with the Vulkan and ROCm results joined by a line, so the
+    pair *and its gap* read directly instead of being reconstructed from two bars;
+  * the model list, its order and its labels all come from the matrix and the
+    rollup (never a hardcoded list), so a newly swept cell appears without editing
+    this file — ordering by model size also shows the throughput/size relationship;
+  * generation is plotted against the dense-model bandwidth ceiling
+    (256 GB/s ÷ model size, README "ceiling rule of thumb"), which is what makes
+    the MoE cells' sub-ceiling behaviour visible rather than just "bigger number".
 """
 import collections
 import csv
 import os
+
+import yaml
 
 import matplotlib
 matplotlib.use("Agg")
@@ -20,26 +31,24 @@ import numpy as np
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV = f"{REPO}/results/consolidated.csv"
+MATRIX = f"{REPO}/matrix.yaml"
 OUT = f"{REPO}/charts"
 
-# Order and short labels match the README headline table.
-MODEL_ORDER = [
-    "gpt-oss-120b-mxfp4",
-    "qwen3-coder-30b-a3b-q6_k",
-    "qwen3.5-35b-a3b-q6_k",
-    "qwen3.8-27b-q5_k_xl",
-    "qwen3.8-27b-q6_k",
-]
-SHORT = {
-    "gpt-oss-120b-mxfp4": "gpt-oss-120b\n(MoE · 120B · MXFP4)",
-    "qwen3-coder-30b-a3b-q6_k": "Qwen3-Coder-30B-A3B\n(MoE · ~3B active)",
-    "qwen3.5-35b-a3b-q6_k": "Qwen3.5-35B-A3B\n(MoE · ~3B active)",
-    "qwen3.8-27b-q5_k_xl": "Qwen3.8-27B\n(dense · Q5_K_XL)",
-    "qwen3.8-27b-q6_k": "Qwen3.8-27B\n(dense · Q6_K)",
-}
 BACKENDS = ["vulkan", "rocm"]
 COLORS = {"vulkan": "#4C72B0", "rocm": "#DD8452"}
 LABELS = {"vulkan": "Vulkan", "rocm": "ROCm"}
+CEILING_COLOR = "#666666"
+CEILING_BW = 256.0          # GB/s, README: memory bandwidth of the box
+METRIC_COLORS = {"tg512_bench_tps": "#8172B2", "pp2048_bench_tps": "#64B5CD"}
+METRIC_LABELS = {"tg512_bench_tps": "generation (tg512)",
+                 "pp2048_bench_tps": "prefill (pp2048)"}
+
+
+def load_matrix():
+    """cell id -> {model, quant, size_gib, arch} from the frozen matrix."""
+    with open(MATRIX) as f:
+        m = yaml.safe_load(f)
+    return {c["id"]: c for c in m["cells"]}
 
 
 def load_latest():
@@ -55,49 +64,144 @@ def load_latest():
     return vals
 
 
-def grouped_hbar(vals, metric, title, xlabel, fmt):
-    models = [m for m in MODEL_ORDER if (m, "vulkan") in vals]
-    fig, ax = plt.subplots(figsize=(7.5, 3.6))
-    y = np.arange(len(models))
-    height = 0.38
-    for i, backend in enumerate(BACKENDS):
-        values = [vals[(m, backend)].get(metric, 0.0) for m in models]
-        offset = (i - (len(BACKENDS) - 1) / 2) * height
-        bars = ax.barh(y + offset, values, height=height,
-                       label=LABELS[backend], color=COLORS[backend], zorder=3)
-        ax.bar_label(bars, fmt=fmt, padding=2, fontsize=8)
+def comparable_cells(vals):
+    """Cells measured on *every* backend, ordered by model size then cell id.
+
+    A cell missing a backend is skipped rather than plotted against a guess —
+    plotting one-sided rows would silently imply a comparison that was never run.
+    """
+    by_cell = collections.defaultdict(set)
+    for cell, backend in vals:
+        by_cell[cell].add(backend)
+    complete = [c for c, bs in by_cell.items() if set(BACKENDS) <= bs]
+    meta = load_matrix()
+    return sorted(complete, key=lambda c: (meta.get(c, {}).get("size_gib", 0), c))
+
+
+def row_label(cell, meta):
+    m = meta.get(cell, {})
+    name = m.get("model", cell)
+    bits = [b for b in (m.get("quant"), (f"{m['size_gib']:g} GiB" if "size_gib" in m else None)) if b]
+    tier = m.get("arch")
+    return f"{name}\n{' · '.join(bits)}" + (f"\n{tier}" if tier in ("moe", "dense") else "")
+
+
+def dumbbell(ax, vals, cells, meta, metric, fmt):
+    """One row per model: Vulkan and ROCm dots joined, values printed per row."""
+    y = np.arange(len(cells))
+    for i, cell in enumerate(cells):
+        pair = [(b, vals[(cell, b)][metric]) for b in BACKENDS if metric in vals.get((cell, b), {})]
+        if len(pair) < 2:
+            continue
+        xs = [v for _, v in pair]
+        ax.plot([min(xs), max(xs)], [i, i], color="#999999", lw=2.2, zorder=2,
+                solid_capstyle="round")
+        for b, v in pair:
+            ax.scatter([v], [i], s=52, color=COLORS[b], zorder=3,
+                       label=LABELS[b] if i == 0 else None, edgecolor="white", linewidth=0.8)
+        v_r = vals[(cell, "rocm")].get(metric)
+        v_v = vals[(cell, "vulkan")].get(metric)
+        ax.annotate(f"V {fmt % v_v} · R {fmt % v_r}", (max(xs), i),
+                    textcoords="offset points", xytext=(7, -3), fontsize=7.5,
+                    color="#444444")
+
+    # Dense cells: mark the bandwidth ceiling they are physically bounded by.
+    first = True
+    for i, cell in enumerate(cells):
+        if meta.get(cell, {}).get("arch") != "dense":
+            continue
+        size = meta[cell].get("size_gib")
+        if not size:
+            continue
+        ax.scatter([CEILING_BW / size], [i], marker="x", s=46, color=CEILING_COLOR,
+                   zorder=4, linewidths=1.8,
+                   label="dense ceiling (256 GB/s ÷ size)" if first else None)
+        first = False
 
     ax.set_yticks(y)
-    ax.set_yticklabels([SHORT[m] for m in models], fontsize=9)
+    ax.set_yticklabels([row_label(c, meta) for c in cells], fontsize=8)
+    ax.set_xlim(0, ax.get_xlim()[1] * 1.22)
+    ax.invert_yaxis()
+
+
+def finish(ax, title, xlabel, legend_loc="lower right"):
     ax.set_xlabel(xlabel)
     ax.set_title(title, fontsize=11, loc="left")
     ax.grid(axis="x", color="#e5e5e5", zorder=0)
     ax.set_axisbelow(True)
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
-    ax.legend(frameon=False, loc="lower right", fontsize=9)
-    fig.tight_layout()
-    return fig
+    ax.legend(frameon=False, fontsize=8, loc=legend_loc)
+
+
+def chart_metric(vals, cells, meta, metric, title, xlabel, fmt, filename):
+    fig, ax = plt.subplots(figsize=(8.6, 0.52 * len(cells) + 1.5))
+    dumbbell(ax, vals, cells, meta, metric, fmt)
+    finish(ax, title, xlabel)
+    path = os.path.join(OUT, filename)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {path} ({len(cells)} cells)")
+    return path
+
+
+def chart_delta(vals, cells, meta, filename):
+    """ROCm vs Vulkan, per model, for both metrics — the split in one picture."""
+    fig, ax = plt.subplots(figsize=(8.6, 0.52 * len(cells) + 1.5))
+    y = np.arange(len(cells))
+    height = 0.36
+    for i, metric in enumerate(("tg512_bench_tps", "pp2048_bench_tps")):
+        deltas = []
+        for cell in cells:
+            v = vals[(cell, "vulkan")][metric]
+            r = vals[(cell, "rocm")][metric]
+            deltas.append((r - v) / v * 100)
+        offset = (i - 0.5) * height
+        bars = ax.barh(y + offset, deltas, height=height,
+                       color=METRIC_COLORS[metric], label=METRIC_LABELS[metric], zorder=3)
+        for bar, d in zip(bars, deltas):
+            ax.annotate(f"{d:+.1f}%", (d, bar.get_y() + bar.get_height() / 2),
+                        textcoords="offset points",
+                        xytext=(5 if d >= 0 else -5, -3),
+                        ha="left" if d >= 0 else "right", fontsize=7.5, color="#444444")
+
+    ax.axvline(0, color="#333333", lw=1.1, zorder=4)
+    ax.set_yticks(y)
+    ax.set_yticklabels([row_label(c, meta) for c in cells], fontsize=8)
+    lo, hi = ax.get_xlim()
+    ax.set_xlim(lo - 2, hi + 2)
+    ax.invert_yaxis()
+    finish(ax, "Backend difference per model", "ROCm relative to Vulkan (%)\n"
+                                               "positive = ROCm faster · negative = Vulkan faster",
+           legend_loc="lower right")
+    path = os.path.join(OUT, filename)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {path} ({len(cells)} cells)")
+    return path
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     vals = load_latest()
+    meta = load_matrix()
+    cells = comparable_cells(vals)
+    if not cells:
+        raise SystemExit("no cell has results on both backends — nothing to plot")
 
-    charts = [
-        ("generation_tps.png", "tg512_bench_tps",
-         "Generation throughput (llama-bench tg512)", "tok/s", "%.1f"),
-        ("prefill_tps.png", "pp2048_bench_tps",
-         "Prompt processing (llama-bench pp2048)", "tok/s", "%.0f"),
-        ("tokens_per_watt.png", "tok_per_w",
-         "Generation efficiency (tokens per watt)", "tok/s per W", "%.2f"),
-    ]
-    for filename, metric, title, xlabel, fmt in charts:
-        fig = grouped_hbar(vals, metric, title, xlabel, fmt)
-        path = os.path.join(OUT, filename)
-        fig.savefig(path, dpi=150)
-        plt.close(fig)
-        print(f"wrote {path}")
+    # Two orderings: size (shows the throughput/size relationship) and efficiency.
+    eff_order = sorted(cells, key=lambda c: -vals[(c, "vulkan")].get("tok_per_w", 0))
+
+    chart_metric(vals, cells, meta, "tg512_bench_tps",
+                 "Generation throughput (llama-bench tg512)", "tok/s", "%.1f",
+                 "generation_tps.png")
+    chart_metric(vals, cells, meta, "pp2048_bench_tps",
+                 "Prompt processing (llama-bench pp2048)", "tok/s", "%.0f",
+                 "prefill_tps.png")
+    chart_metric(vals, eff_order, meta, "tok_per_w",
+                 "Generation efficiency (tokens per watt)", "tok/s per W", "%.2f",
+                 "tokens_per_watt.png")
+    chart_delta(vals, cells, meta, "backend_delta.png")
 
 
 if __name__ == "__main__":

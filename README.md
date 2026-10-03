@@ -94,8 +94,11 @@ to 88 °C vs 85 °C).
 
 ### Charts
 
-The MoE models (a few billion *active* parameters) are ~5–7× faster at generation
-and ~5–8× more efficient per watt than the dense 27B models:
+All nine measured cells, both backends, ordered by model size (small → large). Each row
+is one model with its Vulkan and ROCm results joined by a line, so the pair *and the size
+of the gap* read directly. On the generation chart the dense-model bandwidth ceiling
+(256 GB/s ÷ model size) is marked ✕ where it applies — every dense cell lands at 77–85% of
+it, while the MoE cells clear it outright, which is the MoE advantage in one line:
 
 ![Generation throughput — tg512 (tok/s)](charts/generation_tps.png)
 
@@ -103,14 +106,23 @@ and ~5–8× more efficient per watt than the dense 27B models:
 
 ![Generation efficiency — tokens per watt](charts/tokens_per_watt.png)
 
-*Generated from `results/consolidated.csv` by `scripts/make_charts.py` (Vulkan =
-blue, ROCm = orange).*
+The backend split as a single picture — bars are ROCm relative to Vulkan, so positive is
+ROCm faster and negative Vulkan faster. Across all nine cells it is unanimous: **Vulkan
+wins generation in 9 of 9 (ROCm trails by 1.7–15.5%) and ROCm wins prefill in 9 of 9 (by
+2.0–24.5%)** — the MoE 30–35B cells show by far the widest prefill gap:
+
+![Backend difference — ROCm vs Vulkan](charts/backend_delta.png)
+
+MoE models (a few billion *active* parameters) are still ~5–7× faster at generation and
+~5–8× more efficient per watt than the dense 27B/32B cells. *Generated from
+`results/consolidated.csv` by `scripts/make_charts.py` (Vulkan = blue, ROCm = orange);
+`tests/test_charts.py` fails if a newly swept cell is missing from the figures.*
 
 ### Next-round cells (2026-10-03)
 
 Four downloaded models added to `matrix.yaml` as the next-round cells, swept the same
-way. The charts above cover the five headline cells of 2026-10-02; these are tabulated
-here and in [results/table.md](results/table.md).
+way. The charts above now cover all nine cells including these; the full per-cell metrics
+are in [results/table.md](results/table.md).
 
 | Cell | Quant | Backend | pp2048 t/s | tg512 bench t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |
 |---|---|---|---|---|---|---|---|---|

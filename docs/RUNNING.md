@@ -236,6 +236,15 @@ g++ -O2 -std=c++17 -I$L/include -I$L/ggml/include tools/score_ll.cpp \
   -L$L/build/bin -lllama -lggml -lggml-base -Wl,-rpath,$L/build/bin -o tools/score_ll
 ```
 
+The scorer's loop — one context pass, a short pass per choice, and the KV rollback that
+lets the next choice reuse the context — is pinned by `tests/test_score_ll.py`:
+choice-order invariance, repeated-choice identity (the rollback's failure mode), and a
+CPU golden. It skips unless the binary and `Qwen3-4B-Q4_K_M.gguf` are present:
+
+```
+/usr/bin/python3 -m unittest discover -s tests -p 'test_score_ll.py' -v
+```
+
 Run (`scripts/finbench.py` stays stdlib + PyYAML; data comes from the HF datasets-server REST
 API and is cached resumably under `~/.cache/finbench/`):
 

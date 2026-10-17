@@ -351,6 +351,7 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
 def consolidate(run_id):
     """Roll every model of this run into a CSV + markdown table (one row per model/task)."""
     rows, models, pilot = [], [], 0
+    raw = {}                        # cell -> {task: unrounded acc}, for the mean column
     base = f"{RESULTS}/finbench-{run_id}"
     if not os.path.isdir(base):
         return
@@ -361,6 +362,7 @@ def consolidate(run_id):
         s = json.load(open(sp, encoding="utf-8"))
         models.append(cell)
         pilot = max(pilot, s.get("pilot_limit") or 0)
+        raw[cell] = {task: d["acc"] for task, d in s["tasks"].items()}
         for task, d in s["tasks"].items():
             rows.append({"run_id": run_id, "cell": cell, "task": task,
                          "n": d["n"], "acc": round(d["acc"], 4),
@@ -391,7 +393,9 @@ def consolidate(run_id):
     ranked = []
     for cell in models:
         vals = {r["task"]: r for r in rows if r["cell"] == cell}
-        accs = [vals[t]["acc"] for t in tasks if t in vals]
+        # M-5: average the unrounded accuracies. The CSV stores 4-decimal values,
+        # so averaging those rounds a second time for no reason.
+        accs = [raw[cell][t] for t in tasks if t in raw[cell]]
         ranked.append((sum(accs) / len(accs), cell, vals))
     for mean, cell, vals in sorted(ranked, reverse=True):
         md.append(f"| {cell} | " + " | ".join(

@@ -1,6 +1,6 @@
 # Results
 
-> Rollup built by harness `bf93a0eddd19`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.
+> Rollup built by harness `b31d8dfbcbd5`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.
 
 ## run-20261002-1719 — rocm
 

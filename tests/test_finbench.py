@@ -5,9 +5,12 @@ wrong while still producing plausible-looking numbers, so they are pinned here a
 the upstream definitions (lm_eval/api/task.py, <family>/cf/*_utils.py).
 """
 
+import json
 import os
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
 
@@ -96,6 +99,48 @@ class TransformTest(unittest.TestCase):
             self.assertIn("upstream", spec, name)
             self.assertIn("cf/", spec["upstream"], name)
             self.assertTrue(spec["doc_to_text"], name)
+
+
+class RunModelTest(unittest.TestCase):
+    """run_model() wiring: per-task skip counts and de-identified model provenance."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.results = os.path.join(self._tmp.name, "results")
+        self.gguf = os.path.join(self._tmp.name, "models",
+                                 "Llama-Poro-2-8B-Instruct.Q8_0.gguf")
+        os.makedirs(os.path.dirname(self.gguf), exist_ok=True)
+        with open(self.gguf, "w"):
+            pass
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _run(self, skips):
+        with mock.patch.object(finbench, "RESULTS", self.results), \
+             mock.patch.object(finbench, "fetch_rows",
+                               side_effect=lambda task, data_dir, limit=None, quiet=False: []), \
+             mock.patch.object(finbench, "build_items",
+                               side_effect=lambda task, rows, limit=None: ([], skips[task])), \
+             mock.patch.object(finbench, "score", return_value=({}, {})):
+            return finbench.run_model("poro2-8b-q8_0", self.gguf, "t",
+                                      ["arc_c", "sib200"], 0, "d", 99, 4096, 16, False)
+
+    def test_skipped_is_reported_per_task(self):
+        """Each task's summary carries ITS own skips, not the cumulative total."""
+        summaries = self._run({"arc_c": 3, "sib200": 0})
+        self.assertEqual(summaries["arc_c"]["skipped"], 3)
+        self.assertEqual(summaries["sib200"]["skipped"], 0)
+
+    def test_summary_model_is_basename_not_absolute_path(self):
+        """summary.json must not leak the machine's /home/<user> path."""
+        self._run({"arc_c": 0, "sib200": 0})
+        with open(os.path.join(self.results, "finbench-t", "poro2-8b-q8_0",
+                               "summary.json")) as f:
+            s = json.load(f)
+        self.assertEqual(s["model"], "Llama-Poro-2-8B-Instruct.Q8_0.gguf")
+        self.assertNotIn("/home/", s["model"])
+        self.assertNotIn("/halo", s["model"])
 
 
 if __name__ == "__main__":

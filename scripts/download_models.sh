@@ -2,10 +2,10 @@
 # Download the five ungated "next round" GGUF models into ~/.local/share/models/.
 #
 # No Hugging Face token required — all five repos are public (ungated):
-#   Qwen3-4B (Q8_0), Poro 2 8B (Q8_0), EuroLLM-9B (Q8_0),
+#   Qwen3-4B (Q8_0), Poro 2 8B (Q8_0 + Q4_K_M), EuroLLM-9B (Q8_0),
 #   Qwen3-32B (Q5_K_M), Poro 2 70B (Q4_K_M).
 #
-# Resumable (wget -c); re-run to continue any partial download. Total ~82 GiB.
+# Resumable (wget -c); re-run to continue any partial download. Total ~87 GiB.
 # The gated picks (Gemma 3 27B, Llama 3.3 70B) are intentionally NOT here —
 # they need an HF token and `huggingface-cli download`, not plain wget.
 #
@@ -28,6 +28,11 @@ download "Qwen3-4B-Q8_0.gguf" \
 
 download "Llama-Poro-2-8B-Instruct.Q8_0.gguf" \
     "https://huggingface.co/mradermacher/Llama-Poro-2-8B-Instruct-GGUF/resolve/main/Llama-Poro-2-8B-Instruct.Q8_0.gguf"
+
+# Quant-matched twin of the Q8_0 above, for the FIN-bench Finnish-vs-English comparison
+# (Poro 2 8B vs Qwen3-8B, both Q4_K_M — see README "Finnish capability"). ~4.6 GiB.
+download "Llama-Poro-2-8B-Instruct.Q4_K_M.gguf" \
+    "https://huggingface.co/mradermacher/Llama-Poro-2-8B-Instruct-GGUF/resolve/main/Llama-Poro-2-8B-Instruct.Q4_K_M.gguf"
 
 download "EuroLLM-9B-Instruct-Q8_0.gguf" \
     "https://huggingface.co/bartowski/EuroLLM-9B-Instruct-GGUF/resolve/main/EuroLLM-9B-Instruct-Q8_0.gguf"

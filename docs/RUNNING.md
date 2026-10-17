@@ -247,7 +247,9 @@ API and is cached resumably under `~/.cache/finbench/`):
 ```
 
 **Scope:** the five families that have a `cf` variant — `arc_c`, `belebele_fin`, `goldenswag`,
-`scandisent`, `sib200` — at prompt variant `p0`, zero-shot: 7,296 items. `squad_fi` and
+`scandisent`, `sib200` — at prompt variant `p0`, zero-shot: 7,296 items. `goldenswag` is
+scored on its `train` split (its test labels are withheld upstream), while the other four use
+`test`. `squad_fi` and
 `truthfulqa` exist upstream only as `gen`/`mc1`/`mc2`, so a cf-only run excludes them by
 construction rather than by omission. Per-task detail lands in
 `results/finbench-<run>/<cell>/<task>.json` (gitignored); the rollups

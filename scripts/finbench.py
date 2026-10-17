@@ -55,6 +55,9 @@ RESULTS = f"{REPO}/results"
 MODELS = {
     # cell id -> gguf, mirroring matrix.yaml (the Finnish question's four cells)
     "poro2-8b-q8_0": f"{MODELS_DIR}/Llama-Poro-2-8B-Instruct.Q8_0.gguf",
+    # Quant-matched twin of qwen3-8b-q4_k_m, so the same-size Finnish-vs-English
+    # comparison stops being confounded by quantisation.
+    "poro2-8b-q4_k_m": f"{MODELS_DIR}/Llama-Poro-2-8B-Instruct.Q4_K_M.gguf",
     "poro2-70b-q4_k_m": f"{MODELS_DIR}/Llama-Poro-2-70B-Instruct.Q4_K_M.gguf",
     "eurollm-9b-q8_0": f"{MODELS_DIR}/EuroLLM-9B-Instruct-Q8_0.gguf",
     "qwen3-8b-q4_k_m": f"{MODELS_DIR}/Qwen3-8B-Q4_K_M.gguf",
@@ -318,11 +321,11 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
     if not os.path.isfile(model_path):
         print(f"  SKIP: {model_path} not on disk")
         return None
-    items, summaries, skipped = [], {}, 0
+    items, summaries, skipped = [], {}, {}
     for task in tasks:
         rows = fetch_rows(task, data_dir, limit=pilot)
         t_items, t_skipped = build_items(task, rows, limit=pilot)
-        skipped += t_skipped
+        skipped[task] = t_skipped
         items.extend(t_items)
         print(f"  {task}: {len(t_items)} items"
               + (f" ({t_skipped} skipped)" if t_skipped else ""))
@@ -331,7 +334,7 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
         t_items = [it for it in items if it[0].startswith(task + "::")]
         res = evaluate(task, t_items, lls, ntoks)
         summaries[task] = {k: v for k, v in res.items() if k != "items"}
-        summaries[task]["skipped"] = skipped
+        summaries[task]["skipped"] = skipped[task]
         outdir = f"{RESULTS}/finbench-{run_id}/{cell}"
         os.makedirs(outdir, exist_ok=True)
         with open(f"{outdir}/{task}.json", "w", encoding="utf-8") as f:
@@ -339,7 +342,7 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
         print(f"    {task:<14} n={res['n']:<5} acc={res['acc']:.4f} acc_norm={res['acc_norm']:.4f}")
     outdir = f"{RESULTS}/finbench-{run_id}/{cell}"
     with open(f"{outdir}/summary.json", "w", encoding="utf-8") as f:
-        json.dump({"cell": cell, "model": model_path, "run_id": run_id,
+        json.dump({"cell": cell, "model": os.path.basename(model_path), "run_id": run_id,
                    "formulation": "cf", "prompt_variant": "p0",
                    "pilot_limit": pilot, "tasks": summaries}, f, indent=1, ensure_ascii=False)
     return summaries

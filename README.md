@@ -84,7 +84,7 @@ per-cell detail (power, temperature, per-request TTFT): [results/table.md](resul
 | qwen3.8-27b-q6_k | Q6_K | rocm | 336.27 | 9.84 | 9.73 | 150.0 | 0.11 | 20.59 |
 
 **Vulkan takes generation, ROCm takes prompt processing — 5–0 each way.** Vulkan
-is faster on `tg512` on all five cells (ROCm trails by 1.7–18.3%), while ROCm is
+is faster on `tg512` on all five cells (ROCm trails by 1.7–15.5%), while ROCm is
 faster on `pp2048` prefill on all five (by 2.0–16.2%). ROCm also runs hotter (up
 to 88 °C vs 85 °C).
 
@@ -152,7 +152,7 @@ Throughput says nothing about whether a model writes good Finnish. This is the o
 [FIN-bench-v2](https://huggingface.co/datasets/TurkuNLP/FIN-bench) suite, run on the pinned
 llama.cpp build by `tools/score_ll` + `scripts/finbench.py` (see
 [docs/RUNNING.md](docs/RUNNING.md#9-finnish-capability-axis--fin-bench-v2-cf--p0) for why it
-needs its own scorer). Four models × the five task families that have a `cf` variant × prompt
+needs its own scorer). Five models × the five task families that have a `cf` variant × prompt
 variant `p0`, zero-shot — 7,296 items per model, all of them scored: no skips, no context
 overflows, no unusable gold indices.
 
@@ -164,26 +164,31 @@ length, exactly as the harness does. Full detail: [results/finbench-table.md](re
 | poro2-70b-q4_k_m | 0.455 / 0.486 | 0.570 / 0.470 | 0.649 / 0.714 | 0.954 / 0.954 | 0.518 / 0.435 | **0.629** |
 | eurollm-9b-q8_0 | 0.421 / 0.445 | 0.537 / 0.471 | 0.521 / 0.587 | 0.944 / 0.944 | 0.596 / 0.567 | 0.604 |
 | poro2-8b-q8_0 | 0.396 / 0.420 | 0.469 / 0.417 | 0.587 / 0.638 | 0.942 / 0.942 | 0.356 / 0.263 | 0.550 |
+| poro2-8b-q4_k_m | 0.389 / 0.420 | 0.452 / 0.407 | 0.579 / 0.630 | 0.922 / 0.922 | 0.306 / 0.217 | 0.530 |
 | qwen3-8b-q4_k_m | 0.310 / 0.364 | 0.434 / 0.410 | 0.389 / 0.344 | 0.499 / 0.499 | 0.515 / 0.611 | 0.430 |
 
 Three things stand out:
 
-- **Finnish adaptation buys a lot at equal size.** Poro 2 8B beats the English-centric Qwen3-8B
-  by 12 points of mean acc (0.550 vs 0.430), winning four of five tasks: +8.6 pts on arc_c,
-  +19.8 on goldenswag, +44.3 on scandisent.
+- **Finnish adaptation buys a lot at equal size.** Quant-matched at Q4_K_M, Poro 2 8B beats the
+  English-centric Qwen3-8B by 10 points of mean acc (0.530 vs 0.430), winning four of five tasks:
+  +7.9 pts on arc_c, +19.0 on goldenswag, +42.3 on scandisent. The Q8_0 Poro 2 8B scores 0.550,
+  so an unmatched Q8-vs-Q4 comparison overstates this gap by ~2 points.
 - **Sentiment is a cliff, not a gradient.** Qwen3-8B scores 0.499 on a binary task — exactly
   chance — where every Finnish-capable model is at ~0.94. It cannot produce
   "positiivinen"/"negatiivinen" as continuations at all.
 - **The Finnish-specific model loses topic classification.** sib200 is the one task where
-  Poro 2 8B (0.356) trails Qwen3-8B (0.515); the 70B (0.518) only ties it, while the generalist
-  EuroLLM-9B leads at 0.596. Finnish adaptation is not uniformly better — and EuroLLM-9B also
-  beats both Finnish-focused models on mean acc.
+  Poro 2 8B trails Qwen3-8B (0.356 Q8_0 / 0.306 Q4_K_M vs 0.515); the 70B (0.518) only ties it,
+  while the generalist EuroLLM-9B leads at 0.596. Finnish adaptation is not uniformly better:
+  EuroLLM-9B beats the Finnish-focused Poro 2 8B on mean acc (0.604 vs 0.550 / 0.530), though
+  the larger Poro 2 70B still leads overall at 0.629.
 
-Caveats before quoting these: the quantisations are **not matched** (Qwen3-8B is Q4_K_M, the
-others Q8_0 — plausibly worth 1–2 points, not 12); this is the `cf` formulation at one prompt
-variant, so it is not comparable with published FIN-bench tables (the paper notes formulation
-effects, singling out Poro 2 70B as strong in CF specifically); and GPU-vs-CPU logprob numerics
-differ by up to ~0.12, harmless for a task score but able to flip a near-tie.
+Caveats before quoting these: the Poro 2 8B vs Qwen3-8B comparison is now **quant-matched**
+(both Q4_K_M) — the twin pins the quant effect at ~2 points (0.550 → 0.530), not the whole gap;
+the remaining Q8_0 cells (EuroLLM-9B, Poro 2 8B Q8_0) still differ in quant from their
+neighbours; this is the `cf` formulation at one prompt variant, so it is not comparable with
+published FIN-bench tables (the paper notes formulation effects, singling out Poro 2 70B as
+strong in CF specifically); and GPU-vs-CPU logprob numerics differ by up to ~0.12, harmless
+for a task score but able to flip a near-tie.
 
 ## Running it
 
@@ -231,7 +236,7 @@ GGUF files and llama.cpp build, then follow [docs/RUNNING.md](docs/RUNNING.md).
 | `docs/RUNNING.md` | operator guide |
 | `docs/env.md` | machine fingerprint |
 | `results/consolidated.csv`, `results/table.md` | tracked rollups |
-| `tests/` | stdlib-unittest suite (parser, consolidate, defaults wiring) |
+| `tests/` | stdlib-unittest suite (parser, consolidate, defaults wiring, run_model) |
 | `PLAN.md`, `REVIEW.md` | methodology decisions + independent review |
 
 ## Roadmap

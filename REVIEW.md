@@ -1,55 +1,45 @@
 # Independent Code Review — local-llm-benchmarks
 
-**Date:** 2026-10-03 · **Reviewer:** independent (no shared context with implementer)
-**Scope:** full repo at HEAD `e90dfd1` (`main`), working tree including the uncommitted deletion of the
-prior `REVIEW.md` and the untracked `SMOKE_COMMAND.txt`; all 3 harness scripts (~730 LOC) and the tracked
-rollups (`results/consolidated.csv`, `results/table.md`).
-**Verdict: APPROVED for the harness + results deliverable (no blocking issues).**
-The prior review (commit `e6c1e32`, "NOT APPROVED") flagged 3 blocking (B1–B3) and 4 important (I1–I4)
-issues. All of them are fixed and now verified against real run artifacts, not just code inspection. The
-full sweep has landed and the rollups are internally consistent and idempotent.
+**Date:** 2026-10-04 · **Reviewer:** independent (no shared context with implementer)
+**Scope:** full repo at HEAD `b334f30` (`main`), plus the uncommitted working-tree edit to
+`scripts/finbench.py`. Focus is the FIN-bench-v2 Finnish-capability axis added since the prior
+review (`scripts/finbench.py`, `tools/score_ll.cpp`, `results/finbench-*`, `tests/test_finbench.py`),
+with the throughput harness (`run_sweep.py` / `sampler.py` / `ttft_probe.py`) re-verified in place.
 
-> **Post-review resolution (2026-10-03):** the two Important issues below (I-1 dead `matrix.yaml`
-> `defaults`, I-2 no tests) were subsequently fixed at the operator's request. I-1: `run_sweep.py` now
-> reads `matrix.yaml` `defaults` via `build_parser()` and threads `threads/ngl/warmup/power-hz` through to
-> the bench/server/sampler subprocesses. I-2: a stdlib-`unittest` suite (`tests/`, 9 tests) now covers the
-> `llama-bench` parser, `consolidate()` rebuild-not-append, and the defaults wiring; `consolidate()` also
-> got its file handles closed and the unused `meta` read removed. Verified: `python3 -m unittest discover
-> -s tests` → 9 passed, and `--consolidate` still reproduces the tracked rollups byte-identically (121
-> rows).
->
-> Minor items also resolved (2026-10-03): M-1 (removed `SMOKE_COMMAND.txt`; this file restores the
-> dangling `REVIEW.md` references), M-4 (renamed `run-20261002-1710/` → `superseded-aborted-…`), M-7
-> (`table.md` now records the rollup's own harness commit), and the README was rewritten for public
-> consumption (internal roadmap language removed; the `tg512` figure corrected to 1.7–18.3%).
+**Verdict: APPROVED with two README factual errors and one incomplete uncommitted change to fix
+(no blocking issues).** The FIN-bench axis is well-built and internally consistent: the tracked
+rollups reproduce byte-identically from the per-model `summary.json` tree, and the Finnish table in
+the README matches the data value-for-value. The harness is unchanged from the prior approval and
+still green (28 tests).
+
+> **Supersedes the prior REVIEW.md.** The prior review (dated 2026-10-03, "APPROVED for the harness +
+> results deliverable") referenced commits (`e90dfd1`, `e6c1e32`, `3e6b108`, …) that no longer exist in
+> the rewritten history, and it predates the entire FIN-bench axis. Its harness findings (B1–B3, I1–I4)
+> are re-confirmed here as resolved. The new findings below concern the FIN-bench work and two
+> README-analysis statements.
 
 ---
 
 ## 1. Overall assessment
 
-The repo has gone from scaffold to a completed benchmark deliverable since the prior review. The harness
-(`scripts/run_sweep.py`, `scripts/sampler.py`, `scripts/ttft_probe.py`) is stdlib + PyYAML only, idle-gated
-at start **and** per cell with a settle wait, fail-loud on missing sensors/models, and stamps CPU power
-state + both contexts into `run.json`. Security posture is clean: no secrets (scanned; the only "token"
-hits are `max_tokens`/HF-token *mentions*), no `shell=True`, all subprocess calls use argv lists, the
-server binds `127.0.0.1`, and model paths come from a trusted local `matrix.yaml`.
+The FIN-bench-v2 Finnish-capability axis is the substantial new work, and it is sound:
 
-The data is real and cross-checkable. I re-ran the driver's own `--consolidate` on a scratch copy of
-`scripts/ + results/ + matrix.yaml` and it reproduced the tracked `consolidated.csv` and `table.md`
-**byte-identically** — 121 data rows = 11 cells × 11 metrics (no duplicates), confirming B3 is fixed and
-the tracked rollups are current. All 11 valid cells report `complete_decodes: true`, and every
-`ttft.json` decode ran the full 512-token budget (finish_reason "length"). The README headline table
-matches `consolidated.csv` value-for-value (spot-checked pp2048/tg512/TTFT-p50/tok-per-W/VRAM across both
-backends), and the "Vulkan takes generation, ROCm takes prefill — 5–0 each way" claim is accurate against
-the data.
+- `scripts/finbench.py` (455 LOC, stdlib + PyYAML) drives the official `TurkuNLP/finbenchv2-*` suites
+  at the `cf` formulation / `p0` prompt variant, with each task's prompt and `process_docs` transform
+  replicated from the upstream `LumiOpen/lm-evaluation-harness` fork and pinned in `tests/test_finbench.py`.
+- `tools/score_ll.cpp` links the pinned llama.cpp's own `libllama` to compute summed choice
+  loglikelihoods — the correct choice, documented, and the `acc`/`acc_norm` math in `finbench.evaluate()`
+  is a faithful copy of `lm_eval/api/task.py` (`acc_norm` divides by character length, pinned by tests).
+- The data is real and cross-checkable: I re-ran `finbench.consolidate()` on a scratch copy of the
+  `summary.json` tree and it reproduced the tracked `finbench-consolidated.csv` and `finbench-table.md`
+  **byte-identically**. The README's Finnish table matches the rollup (all 20 cells × acc/acc_norm
+  spot-checked; the "12 points", "+8.6/+19.8/+44.3", "0.499 = chance" claims all reconcile).
+- The upstream split choice that looked anomalous (goldenswag `train`, the only non-`test` task) is
+  **correct**: I fetched the upstream `_goldenswag_fi_cf_yaml` and it sets `test_split: train`
+  (goldenswag's test labels are withheld upstream).
 
-Prior findings, verified fixed: B1 (`llama-bench -c` dropped, `ctx_bench`/`ctx_server` both recorded in
-`run.json`), B2 (`--rocm-override` env now threaded into `run_bench`/`probe_cell`/server Popen), B3
-(`consolidate()` opens `"w"`, rebuilds from all run dirs), I1 (`temp1_input` /1000.0 → sane 72–88 °C),
-I2 (`power_w_probe` key now matches), I3 (per-cell idle check + 90 s settle), I4 (hwmon resolved by name,
-loud failure on missing sensors, per-sample read failures skip + warn instead of silent zeros). M3/M5/M6/M7
-from the prior review are also resolved (actual request counts in notes, `bench.log` closed in a
-`finally`, model pre-check at loop start, server timeout scaled by model size).
+Two factual errors in the README's own analysis prose and one incomplete uncommitted edit are the only
+substantive defects. No security, provenance, or data-integrity problems were found.
 
 ---
 
@@ -61,77 +51,83 @@ None.
 
 ## 3. Important issues
 
-### I-1 — `matrix.yaml` `defaults` block is dead configuration (never read by the driver) — RESOLVED 2026-10-03
-`matrix.yaml:5-14` declares `defaults: {backends, gpu_layers, threads_cpu, ctx_size, pp_tokens, tg_tokens,
-repeats, warmup_requests, power_sample_hz}`. `run_sweep.py` loads the YAML but reads **only**
-`matrix["cells"]` (`run_sweep.py:291-295`); a repo-wide grep for `defaults` returns zero hits in the driver.
-Every value in that block is instead hardcoded elsewhere: threads `16` (`run_bench`, `run_sweep.py:171`),
-server ctx `8192` (arg default `run_sweep.py:269`), pp `512,2048` (`:266`), tg `512` (`:267`), repeats `3`
-(`:265`), warmup `1` (`probe_cell`, `:237`), sampler Hz `5` (`main`, `:369-370`).
-**Impact:** the "frozen matrix" reproducibility surface is decorative — an operator who edits
-`threads_cpu` or `ctx_size` in `matrix.yaml` expecting the sweep to honor it gets silent divergence (the
-run still succeeds, but not under the declared conditions). This is a documented-knob-that-is-not-wired
-gap, the kind that has bitten this exact repo before (the `-c`/ctx mismatch in B1).
-**Fix:** either wire `matrix["defaults"]` into the argparse defaults (single source of truth), or delete
-the `defaults` block and state in `matrix.yaml`/`RUNNING.md` that all run parameters are CLI flags.
+### I-1 — README claims "EuroLLM-9B also beats both Finnish-focused models on mean acc" — FALSE
+`README.md:179-180` ("…and EuroLLM-9B also beats both Finnish-focused models on mean acc") is
+contradicted by the repo's own table two paragraphs above it (`README.md:162-167`): Poro 2 70B has mean
+acc **0.629**, EuroLLM-9B **0.604**, Poro 2 8B **0.550**. EuroLLM beats Poro 2 **8B** (0.604 vs 0.550)
+but is **beaten by** Poro 2 **70B** (0.604 vs 0.629). The table ranks Poro 2 70B first (bolded).
+**Impact:** a headline analysis claim that is wrong on its face and would ship to the public README; the
+same table a reader is pointed to proves the opposite.
+**Fix:** e.g. "EuroLLM-9B beats the Finnish-focused Poro 2 8B on mean acc (0.604 vs 0.550), though the
+larger Poro 2 70B still leads overall at 0.629."
 
-### I-2 — No automated test suite — RESOLVED 2026-10-03
-Still true from the prior review ("Missing evidence", item 5). The harness's correctness today rests on
-one real sweep plus this review's re-run of `--consolidate`. The three worst historical defects — B3
-(append-mode row duplication), I2 (`power_w_prob` vs `power_w_probe`), and the `gen_tps` absolute-clock
-divisor bug — would each have been caught by a trivial golden-file test. The README's stated deliverable
-is "repo others can run"; a repo whose parser and rollup have no tests is a regression magnet for anyone
-who touches `run_sweep.py` without the GPU in front of them.
-**Fix (minimum viable):** (a) a `tests/` fixture that feeds a captured `llama-bench` table through
-`run_bench()`'s parser and asserts `pp512/pp2048/tg512` means+stddev; (b) a `consolidate()` test on a
-two-run fixture asserting exact row count and no duplicates; (c) run them via `--consolidate`-style
-stdlib-only invocation so no pytest dependency is introduced.
+### I-2 — README's "ROCm trails by 1.7–18.3%" is wrong (and disagrees with the same README)
+`README.md:87` says Vulkan wins `tg512` "on all five cells (ROCm trails by 1.7–18.3%)". Recomputing the
+per-cell `tg512_bench_tps` delta from `results/consolidated.csv`, the actual range across all ten cells
+is **1.70% to 15.45%** — which is exactly what `README.md:112` already states correctly ("1.7–15.5%").
+The 18.3% is not produced by any metric for the referenced five cells (max server-tg trail is 18.01%,
+and that is a different metric than the "tg512" bench the sentence names). The prior review's own
+resolution note claimed this figure had been "corrected to 1.7–18.3%" — the correction was itself wrong.
+**Impact:** an incorrect, hand-maintained percentage in the headline result section, and an internal
+contradiction (18.3% at line 87 vs 15.5% at line 112 for the same quantity).
+**Fix:** change `1.7–18.3%` to `1.7–15.5%` (or derive the range from `consolidated.csv`).
+
+### I-3 — Uncommitted, incomplete wiring of a 5th FIN-bench model (`poro2-8b-q4_k_m`)
+The working tree adds `"poro2-8b-q4_k_m"` to `MODELS` in `scripts/finbench.py:60` (uncommitted),
+pointing at `~/.local/share/models/Llama-Poro-2-8B-Instruct.Q4_K_M.gguf`. That model is (a) **not on
+disk** (only `…Q8_0.gguf` and the 70B `…Q4_K_M.gguf` are present), (b) **not in `download_models.sh`**
+(which fetches only the Q8_0 for this model), and (c) **not in `matrix.yaml`**, and there are no
+results for it. `--list` reports it `MISSING` and `--all` silently `SKIP`s it (`run_model`,
+`finbench.py:322`) — a quiet gap, not a loud one.
+**Impact:** if committed as-is, the repo advertises a model it cannot run and cannot even download. The
+edit is clearly mid-flight (its comment explains it is meant to de-confound the Poro-2-8B-vs-Qwen3-8B
+comparison by quant-matching, which is a good idea), but it is not ready.
+**Fix:** complete it — add the Q4_K_M download to `download_scripts.sh`/`matrix.yaml`, download the
+file, run the cell, and update the README caveat (which currently still says the quantisations are
+"not matched") — or revert the hunk before committing.
 
 ---
 
 ## 4. Minor issues
 
-- **M-1 — Working-tree hygiene / dangling references — RESOLVED 2026-10-03.** `REVIEW.md` is deleted (uncommitted) but still
-  referenced from `README.md:102,116` and `docs/RUNNING.md:8`. `SMOKE_COMMAND.txt` is untracked and stale
-  (references "REVIEW.md step 3", duplicates `RUNNING.md` §3). This report restores `REVIEW.md`;
-  `SMOKE_COMMAND.txt` should be deleted or folded into `RUNNING.md`.
-- **M-2 — `consolidate()` reads `run.json` into `meta` and never uses it** (`run_sweep.py:425`). Dead
-  read; worse, a malformed `run.json` would raise and abort the entire rollup. Drop the variable or use it
-  (e.g. to stamp `forced`/`ctx` into the notes).
-- **M-3 — `env_binpath(args)` is a misnomer** (`run_sweep.py:416-417`): it returns a binaries path, not an
-  environment. Cosmetic; rename to `binpath(args)`.
-- **M-4 — Leftover aborted run dir `results/run-20261002-1710/` — RESOLVED 2026-10-03.** Its `sweep.log:9-29` shows the pre-fix
-  `gen_tps` probe abort (exit 1), leaving `bench.log` + a 949-row `resources.csv` + `server.log` with no
-  `cell.json`. Gitignored and excluded from the rollup (no `cell.json`), so harmless — but it does not
-  follow the repo's own `-SMOKE-FAILED` / `superseded-*` naming convention for known-bad runs.
-- **M-5 — Power windows omit the server-load phase.** `window_stats` slices `resources.csv` into
-  bench/probe/cell windows (`run_sweep.py:247-257`); the server weight-load between `bench_end` and
-  `probe_start` falls in no power window (only `temp_c_max`/`vram_peak_gib` capture it via `cell_window`).
-  Documented as "generation-phase efficiency" so not wrong, but the `W` columns are easy to misread as
-  whole-cell draw. Consider adding a `load_window` or a note on the table.
-- **M-6 — `llama-bench` parser is column-positional** (`run_sweep.py:177-192`): it assumes the value is the
-  cell immediately after the `pp/tgN` test-name cell. Correct against the pinned build `5b59b83f4` (proven
-  by 11 cells) but fragile if a future llama.cpp adds a column between the test name and t/s. A golden-file
-  test (I-2) would make this breakage visible instead of a silent empty `tests` dict.
-- **M-7 — Run metadata records the capture-time harness, not the consolidate-time harness — RESOLVED 2026-10-03.**
-  `run-20261002-1751/rocm/run.json` stamps `harness_commit: 3e6b108`, but the rollup's `ttft_ms_p50` column
-  was added by a later commit (`07f2162`) and the CSV was re-derived with the newer driver. Harmless
-  because `cell.json` carries every raw value, but "repo others can run" would be tighter if the rollup
-  also recorded the driver commit that produced it.
+- **M-1 — `skipped` is mislabeled per task in `summary.json`.** `scripts/finbench.py:328` accumulates
+  `skipped` across *all* tasks, then `:337` writes that same total into *every* task's summary
+  (`summaries[task]["skipped"] = skipped`). If two tasks each skip rows, every task reports the same
+  (wrong) total. Latent today (all shipped results have `skipped: 0`). Fix: store `t_skipped` per task
+  and keep a separate model-level total.
+- **M-2 — `summary.json` embeds the absolute `/home/halo/…` model path.** `finbench.py:345` writes
+  `"model": model_path` (the `os.path.expanduser`-expanded absolute path). This is protected only by
+  `.gitignore` (`results/finbench-*/`); the throughput driver deliberately keeps `matrix.yaml` paths
+  `~/-relative` with a test enforcing it (`tests/test_defaults.py:55`) precisely to avoid leaking the
+  username, and the FIN-bench driver does not follow the same discipline. Fix: store the cell id (already
+  present) and either drop `model` or store the `~/-relative` path.
+- **M-3 — `results/table.md` provenance stamp is 3 commits stale.** Its header (`results/table.md:3`)
+  records `bf93a0eddd19`, but HEAD is `b334f30` — the FIN-bench commits landed without a `--consolidate`.
+  Informational only (the throughput data is unchanged), but a reader may infer an older harness. A fresh
+  `python3 scripts/run_sweep.py --consolidate` refreshes it.
+- **M-4 — goldenswag is scored on the `train` split and it is not documented.** `finbench.py:133` is the
+  only task with `split: "train"`. This is **correct** (upstream `test_split: train`; test labels are
+  withheld) and I verified it against upstream — but neither README nor `docs/RUNNING.md` says so, and a
+  reader comparing against published FIN-bench tables could assume `test`. Add a one-line note.
+- **M-5 — FIN-bench "mean acc" ranking is computed from 4-decimal-rounded values.** `finbench.py:366`
+  rounds each task `acc` to 4 decimals into the CSV, and `:395` averages those rounded values for the
+  ranking/mean column. The error is ≤0.0001 and invisible at 3-decimal display. Cosmetic.
 
 ---
 
 ## 5. Missing evidence / tests
 
-1. **No test suite** — see I-2. Nothing guards the parser, the window slicing, or `consolidate()`
-   idempotency.
-2. **The sampler's own power cross-check is unrecorded.** `sampler.py:16-18` mandates "cross-check one
-   sample against `rocm-smi --showpower --showtemp` per cell"; I found no captured `rocm-smi` output or
-   note in `results/`. The temperature units are proven sane (72–88 °C, I1 fixed), but the **power** units
-   (µW→W) remain verified only by plausibility, not by the documented cross-check.
-3. **Vulkan TTFT-spread root cause is still open** (`RUNNING.md` §7) — correctly documented and carried as
-   `ttft_ms_p50` alongside the mean, so not a harness gap; just don't quote a Vulkan TTFT mean without the
-   p50 caveat.
+1. **The C++ scorer has no test.** `tools/score_ll.cpp` performs the axis's core computation (context
+   pass, per-choice token decode, log-softmax, KV rollback for choice reuse) and is validated only by a
+   hand-recorded ~3e-4 CPU spot-check quoted in `docs/RUNNING.md:263-266`, not by an automated test. The
+   Python side is well pinned (`tests/test_finbench.py`, 14 tests on metric + transforms), but the
+   tokenization/logprob loop itself is untested. A golden test — feed a tiny fixture (known context +
+   choices) through the binary and assert the summed loglikelihoods — would pin the highest-risk code.
+2. **README percentage ranges are still hand-maintained.** Lines 87, 112-113 carry the generation/prefill
+   delta ranges. Line 87 is already wrong (I-2). The prefill "2.0–16.2%" (line 88, first five cells) and
+   "2.0–24.5%" (line 112, all ten) both reconcile with `consolidated.csv`, but they are typed by hand
+   next to a machine-generated table and will drift again. Consider emitting them from the rollup (the
+   chart script already derives its data that way).
 
 ---
 
@@ -139,24 +135,30 @@ stdlib-only invocation so no pytest dependency is introduced.
 
 In order, low-risk, no GPU needed:
 
-1. Resolve `matrix.yaml` `defaults` (I-1): wire it into argparse defaults or delete it — pick one, don't
-   leave a dead block that implies knobs that do nothing.
-2. Add the two cheap tests from I-2 (parser golden-file + consolidate idempotency) as stdlib-only scripts
-   so the "others can run" claim is actually protected.
-3. Clean the working tree: remove `SMOKE_COMMAND.txt`, rename/delete `results/run-20261002-1710/`, and
-   commit this `REVIEW.md` (which resolves the deleted-file + dangling-reference state in M-1).
-4. Perform and record the one `rocm-smi` power cross-check (missing-evidence item 2) next time a cell runs.
-5. No harness changes block the remaining deliverables (Finnish evals, embeddings, posts). The next sweep
-   can proceed with the current driver.
+1. Fix the two README errors — `README.md:179-180` (EuroLLM "beats both") and `README.md:87`
+   (`1.7–18.3%` → `1.7–15.5%`).
+2. Resolve the uncommitted `poro2-8b-q4_k_m` change: complete it (download + matrix + run + README
+   caveat update) or revert it. Do not commit the `MODELS` entry alone.
+3. Fix M-1 (per-task `skipped`) and M-2 (`~/-relative` model path in `summary.json`).
+4. Optionally re-run `--consolidate` to refresh the `table.md` provenance stamp (M-3).
+5. Add a golden test for `tools/score_ll` next time the scorer is rebuilt (missing-evidence 1).
+6. The remaining roadmap items (English eval set, embeddings, Vulkan TTFT root-cause) are unaffected by
+   any of the above; no harness change blocks them.
 
-Nothing in this review authorizes any financial, production, customer-facing, or security-sensitive action.
-The reviewed artifacts are benchmark data and tooling inside this repository; external publication of the
-headline numbers remains the operator's decision and should carry the Vulkan TTFT caveat attached.
+Nothing in this review authorizes any financial, production, customer-facing, or security-sensitive
+action. The reviewed artifacts are benchmark data and tooling inside this repository; external
+publication of the headline numbers remains the operator's decision and should ship with the two README
+corrections above and the existing Vulkan-TTFT caveat attached.
 
 ---
 
-*Method: full read of all 11 tracked files + 3 scripts; `git log/status/diff`; secrets + `shell=True` +
-tracked-pyc scans; live re-run of the driver's own `--consolidate` on a scratch copy (byte-identical to the
-tracked rollups, 121 rows, no duplicates); per-`ttft.json` `complete_decodes` check across all 11 valid
-cells; value-for-value spot-check of the README headline table against `consolidated.csv`. No changes made
-to the reviewed repo other than this file.*
+*Method: full read of `README.md`, `PLAN.md`, `docs/RUNNING.md`, `docs/env.md`, all five scripts, the
+scorer (`tools/score_ll.cpp`), and all five test files. Ran the repo's own suite
+(`/usr/bin/python3 -m unittest discover -s tests -v`) → 28 tests pass. Re-ran `finbench.consolidate()`
+on a scratch copy of the `summary.json` tree → `finbench-consolidated.csv` and `finbench-table.md`
+reproduced byte-identically. Re-ran `run_sweep.consolidate()` on a scratch mirror of `run.json` +
+`cell.json` → `consolidated.csv` byte-identical, `table.md` identical except the (expected) harness-commit
+stamp. Recomputed the per-cell generation/prefill deltas from `consolidated.csv`. Verified the
+goldenswag `train` split against the upstream `_goldenswag_fi_cf_yaml`. Confirmed the uncommitted model's
+GGUF is absent from disk and from `download_models.sh`. No changes made to the reviewed repo other than
+this file.*

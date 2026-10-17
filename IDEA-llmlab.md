@@ -24,18 +24,18 @@ measured and reviewed:
 
 | Asset in this repo | Lesson it powers |
 |---|---|
-| `results/consolidated.csv` — 11 cells × 2 backends: pp/tg tok/s, TTFT, VRAM, power, °C, tok/s/W | inference phases, MoE vs dense, memory, backends, efficiency |
+| `results/consolidated.csv` — 10 cells × 2 backends: pp/tg tok/s, TTFT, VRAM, power, °C, tok/s/W | inference phases, MoE vs dense, memory, backends, efficiency |
 | Headline cell: gpt-oss-120b MXFP4 @ ~50 t/s on 128 GB unified memory | "how big can local go" |
 | Quant-pair rows (Qwen3.8-27B Q5_K_XL 10.6 t/s vs Q6_K 10.0 t/s) | quantization tradeoff with *measured* speed delta |
 | Two-context caveat (bench 4096 vs server 8192) | context & memory — a real trap the learner steps into |
 | Vulkan/ROCm 5–0 split (generation vs prefill) + 89 °C hot cell | backends; "throttling is data" |
 | Vulkan TTFT warmup finding (`docs/RUNNING.md` §7) | serving & TTFT — a genuine open anomaly to explain |
-| FIN-bench-v2 axis (4 models, 7,296 items/model; Qwen3-8B = chance on sentiment) | "size ≠ quality"; language-specific capability; capstone rubric |
+| FIN-bench-v2 axis (5 models, 7,296 items/model; Qwen3-8B = chance on sentiment) | "size ≠ quality"; language-specific capability; capstone rubric |
 | `scripts/sampler.py` (5 Hz hwmon power/temp/VRAM) | live instrumentation in lessons + `lab` mode |
 | `scripts/ttft_probe.py` (streaming OpenAI client), `run_sweep.py` (`gpu_idle`, `wait_idle`, `parse_bench`, `killpg`) | serving lessons; safe experiment runner |
 | `matrix.yaml` (model registry: id, tier, size, quant, path) | machine adaptivity: what can this learner's box actually run? |
 | `docs/env.md`, `docs/RUNNING.md` | lesson prose; verified-environment discipline (D3) |
-| 30-test stdlib-unittest suite, no-GPU-required | the quality bar the new tool copies |
+| 34-test stdlib-unittest suite, no-GPU-required | the quality bar the new tool copies |
 
 ## 3. Product shape
 
@@ -76,8 +76,8 @@ llmlab selftest        # preflight: llama.cpp builds, on-disk models, GPU idle,
 | 01 | First generation | tokens, streaming, wall time vs tok/s | one timed `llama-cli` run, 64 tokens | — |
 | 02 | Two phases of inference | prefill vs decode; why pp is fast and tg is slow; bandwidth-bound decode | `llama-bench -p 2048 -n 512`; learner predicts tg from `256 GB/s ÷ file size` | Poro 2 8B: 27.1 t/s measured vs ~32 t/s ceiling (85%) |
 | 03 | MoE vs dense | active params; why 120B MoE @ 50 t/s beats 70B dense @ 5 t/s | data-backed compare (optional live: 30B-A3B) | headline cells, 10-of-10 chart data |
-| 04 | Memory & KV cache | weights + KV + overhead; `-ngl`; what fits in *your* RAM | predict KV delta for `-c 4096` vs `-c 8192`, then verify VRAM | VRAM column, all 11 cells; 59 GiB gpt-oss cell |
-| 05 | Quantization | bits/weight; quality–speed–size tradeoff | same prompt, Q5_K_XL vs Q6_K of Qwen3.8-27B (speed) + side-by-side outputs (perceptual) | quant-pair rows; FIN-bench caveat ("not matched quants, plausibly 1–2 pts") |
+| 04 | Memory & KV cache | weights + KV + overhead; `-ngl`; what fits in *your* RAM | predict KV delta for `-c 4096` vs `-c 8192`, then verify VRAM | VRAM column, all 10 cells; 59 GiB gpt-oss cell |
+| 05 | Quantization | bits/weight; quality–speed–size tradeoff | same prompt, Q5_K_XL vs Q6_K of Qwen3.8-27B (speed) + side-by-side outputs (perceptual) | quant-pair rows; FIN-bench quant-matched pair (measured ~2-pt effect) |
 | 06 | Context | context vs memory; the 4096-vs-8192 trap; long-context costs | same prompt at two ctx sizes, measure VRAM + pp tok/s | README "two contexts" caveat, made first-hand |
 | 07 | Sampling | temp / top-p / top-k / seed; determinism | temp 0 twice → byte-identical; temp 1.2 twice → different (hash shown) | — |
 | 08 | Backends | what a backend is; Vulkan vs ROCm; why it differs per machine | data-backed 5–0 split (optional live: one cell × both backends, ETA shown) | the unanimous split, 89 °C cell |
@@ -178,8 +178,8 @@ measured in-session or carries a reference stamp, with no third category (L6).
 ## 8. What this doc deliberately does *not* do
 
 - No code, no commits, no changes to the benchmark harness.
-- Does not touch the pending items in `REVIEW.md` §6 (README fixes, `poro2-8b-q4_k_m`
-  completion) — those are this repo's own next steps, independent of llmlab.
+- Does not touch this repo's own harness/review backlog. The `REVIEW.md` §6 items it
+  pointed at were closed upstream on 2026-10-17; see §10.
 
 ## 9. M0 landed (2026-10-04)
 
@@ -208,3 +208,24 @@ Acceptance, run on this box against the pinned build (`5b59b83f4`):
 Not in M0, and next: lessons m02–m11, `exp/power.py`, `exp/server.py`,
 `data/bench.py` (live reference cells read from this repo's `results/`), the bundled
 snapshot, the `lab` REPL, and the capstone. M1 (m02–m04) is the natural next step.
+
+## 10. Upstream changes since M0 (2026-10-17)
+
+The benchmark repo moved after M0. Lessons that quote it must use these values — the
+rule is that no stale figure is ever presented as current (L6).
+
+- **FIN-bench is 5 models, not 4.** `poro2-8b-q4_k_m` was added to complete the
+  quant-matched 8B comparison: 0.530 mean acc against Qwen3-8B Q4_K_M's 0.430 — a
+  **10-point** gap, not the 12 that an unmatched Q8_0-vs-Q4_K_M pair suggested. The twin
+  measures the quant effect at **~2 points** (Q8_0 0.550 → Q4_K_M 0.530), which is what
+  lesson m05 should teach in place of the old "plausibly 1–2 points" caveat.
+- **The suite is 34 tests, not 30.** Added `tests/test_score_ll.py` (the scorer's
+  KV-rollback invariants plus a CPU golden) and `tests/test_readme_ranges.py` (pins the
+  README's hand-typed backend deltas to the rollup).
+- **The throughput matrix is 10 cells × 2 backends** — this doc previously said 11,
+  which would have become "all 11 cells" in lesson m04.
+- **`results/table.md`'s provenance stamp now records the last commit that changed the
+  driver code**, not HEAD, so it no longer drifts on unrelated commits.
+- **Still open, and therefore still honest teaching material:** the Vulkan TTFT warmup
+  anomaly (`docs/RUNNING.md` §7), which lesson m09 turns into an exercise, and the
+  deferred embeddings / English-eval axes.

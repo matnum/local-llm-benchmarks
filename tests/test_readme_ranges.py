@@ -16,10 +16,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROLLUP = os.path.join(REPO, "results", "consolidated.csv")
 README = os.path.join(REPO, "README.md")
 
-# The five cells of the original sweep — what the README's "five cells" refers to.
+# The five cells of the original sweep — what the README's first "five cells" refers to.
 FIRST_FIVE = {
     "gpt-oss-120b-mxfp4", "qwen3.5-35b-a3b-q6_k", "qwen3-coder-30b-a3b-q6_k",
     "qwen3.8-27b-q5_k_xl", "qwen3.8-27b-q6_k",
+}
+
+# The 2026-10-03 next-round five — the README's second "five cells" block.
+SECOND_FIVE = {
+    "qwen3-4b-q8_0", "poro2-8b-q8_0", "eurollm-9b-q8_0",
+    "qwen3-32b-q5_k_m", "poro2-70b-q4_k_m",
 }
 
 
@@ -46,7 +52,8 @@ class ReadmeRangesTest(unittest.TestCase):
 
     def setUp(self):
         # Collapse whitespace so a prose reflow cannot break the anchors.
-        self.text = " ".join(open(README, encoding="utf-8").read().split())
+        with open(README, encoding="utf-8") as f:
+            self.text = " ".join(f.read().split())
 
     def test_prose_ranges_match_rollup(self):
         cases = [
@@ -54,6 +61,10 @@ class ReadmeRangesTest(unittest.TestCase):
              FIRST_FIVE, "tg512_bench_tps"),
             ("ROCm is faster on `pp2048` prefill on all five (by",
              FIRST_FIVE, "pp2048_bench_tps"),
+            ("Vulkan is faster on `tg512` in 5 of 5 cells (ROCm trails by",
+             SECOND_FIVE, "tg512_bench_tps"),
+            ("ROCm is faster on `pp2048` in 5 of 5 (by",
+             SECOND_FIVE, "pp2048_bench_tps"),
             ("Vulkan wins generation in 10 of 10 (ROCm trails by",
              None, "tg512_bench_tps"),
             ("ROCm wins prefill in 10 of 10 (by",

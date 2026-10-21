@@ -1,0 +1,48 @@
+name: Bug report
+description: The harness, scorer or scripts misbehave
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste raw model paths containing your username, and do not
+        attach model weights. A `run.json` with the cell metadata is usually
+        enough.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Command, expected behaviour, actual behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Trim to the failing part. `sweep.log` / `bench.log` / `server.log` excerpts are ideal.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: versions
+    attributes:
+      label: llama.cpp commit, backend and driver
+      placeholder: "5b59b83f4 / rocm 7.2.4 / Mesa 26.2.3"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python used for the driver
+      description: Include whether it can `import yaml`.
+      placeholder: "/usr/bin/python3 3.14.7, PyYAML 6.0.3"
+    validations:
+      required: false
+  - type: checkboxes
+    id: done
+    attributes:
+      label: Before filing
+      options:
+        - label: I read docs/RUNNING.md §7 (caveats) and my question is not answered there.
+          required: true

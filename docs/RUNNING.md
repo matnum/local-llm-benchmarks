@@ -4,9 +4,11 @@ Operator guide for `scripts/run_sweep.py` — the one-command sweep driver.
 Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLAN.md)
 (design decisions + methodology), [env.md](env.md) (reference-machine fingerprint).
 
-> **State:** the full 5-cell × 2-backend sweep is done (2026-10-02) — see
+> **State:** the full sweep is done — ten cells × two backends, as the first five
+> (2026-10-02) plus five more (2026-10-03) — see
 > [results/table.md](../results/table.md). The harness is independently reviewed
-> ([REVIEW.md](../REVIEW.md)). This guide documents how to run it.
+> ([the independent review](reviews/2026-10-04-independent-review.md)). This guide
+> documents how to run it.
 
 ---
 
@@ -14,7 +16,7 @@ Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLA
 
 | Need | Detail |
 |---|---|
-| Models & builds | The pinned llama.cpp builds and all 5 GGUF models are already on disk (see [env.md](env.md)). No downloads. |
+| Models & builds | The pinned llama.cpp builds and all ten cells' GGUF models are already on disk (see [env.md](env.md)). No downloads. |
 | Python for the driver | Must import **PyYAML** (only `run_sweep.py` needs it — to parse `matrix.yaml`). On the reference machine use **`/usr/bin/python3`** (system python, has PyYAML). A `python3` on `PATH` that points at a venv without PyYAML will be refused with an install hint. The two helpers (`sampler.py`, `ttft_probe.py`) are stdlib-only. |
 | Idle GPU | Any running `llama-server` holding VRAM **must be stopped** before a real sweep (see §2). |
 
@@ -52,7 +54,7 @@ a "CONTAMINATED" warning and stamps `forced: true` into `run.json` (that's how t
 ```
 cd local-llm-benchmarks
 
-# Full sweep of all 5 cells, one backend each:
+# Full sweep of all 10 cells, one backend each:
 /usr/bin/python3 scripts/run_sweep.py --backend vulkan
 /usr/bin/python3 scripts/run_sweep.py --backend rocm
 
@@ -206,7 +208,8 @@ so a stale figure cannot ship with fresh numbers.
 ## 8. Recording a run (reproducibility — manual for now)
 
 The driver does **not** yet auto-commit/tag a run (an open item — see
-[REVIEW.md](../REVIEW.md)). Until that lands, do it by hand after a successful sweep:
+[the 2026-10-04 independent review](reviews/2026-10-04-independent-review.md)). Until
+that lands, do it by hand after a successful sweep:
 
 ```
 git add results/ && git commit -m "run: $(ls -1t results | head -1)" \

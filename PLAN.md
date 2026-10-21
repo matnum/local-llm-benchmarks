@@ -23,7 +23,7 @@ LPDDR5X-8000 (~256 GB/s), CachyOS (Arch-based, kernel 7.2.8), Mesa 26.2.3 RADV
 
 ## 3. Methodology
 
-**Per cell (5 cells × 2 backends):**
+**Per cell (5 cells × 2 backends at planning time; the matrix now covers ten):**
 
 - **`llama-bench`** (matching build dir): `-p {512, 2048}` prompt processing, `-n 512`
   generation, `-r 3` repeats, `-ngl 99` → pp/tg tok/s + peak VRAM. Context note: the

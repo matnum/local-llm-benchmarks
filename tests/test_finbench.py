@@ -1,10 +1,12 @@
-"""Tests for the FIN-bench-v2 driver: metric definitions, transforms, exclusions.
+"""Tests for the FIN-bench-v2 driver: metric definitions, data plumbing, rollups.
 
 The metric math and the two process_docs replicas are the parts that can be silently
 wrong while still producing plausible-looking numbers, so they are pinned here against
-the upstream definitions (lm_eval/api/task.py, <family>/cf/*_utils.py).
+the upstream definitions (lm_eval/api/task.py, <family>/*/*_utils.py). The prompt grid
+itself is pinned in tests/test_finbench_upstream.py.
 """
 
+import csv
 import json
 import os
 import sys
@@ -58,15 +60,18 @@ class MetricTest(unittest.TestCase):
 
 
 class TransformTest(unittest.TestCase):
+    """cf/p0 prompts render to the upstream text (templates vendored, see
+    tests/test_finbench_upstream.py for the whole 5x2x5 grid)."""
+
     def test_arc_c_prompt_matches_upstream_template(self):
         doc = {"question": "K?", "choices": {"text": ["a", "b"], "label": ["A", "B"]}, "answerKey": "B"}
-        prompt, choices, gold = finbench.TASKS["arc_c"]["transform"](doc)
+        prompt, choices, gold = finbench.item_for("arc_c", doc)
         self.assertEqual(prompt, "Vastaus kysymykseen K?, on:")
         self.assertEqual(choices, ["a", "b"])
         self.assertEqual(gold, 1)
 
     def test_scandisent_maps_labels_to_finnish_words(self):
-        prompt, choices, gold = finbench.TASKS["scandisent"]["transform"]({"text": "T", "label": "positive"})
+        prompt, choices, gold = finbench.item_for("scandisent", {"text": "T", "label": "positive"})
         self.assertEqual(choices, ["positiivinen", "negatiivinen"])
         self.assertEqual(gold, 0)                      # string gold -> index in choices
         self.assertEqual(prompt, "Arvostelijan teksti: T\nTunne:")
@@ -74,7 +79,7 @@ class TransformTest(unittest.TestCase):
     def test_goldenswag_process_docs_replica(self):
         doc = {"activity_label": "Ruoka", "ctx_a": "Alku [title] jatkoa", "ctx_b": "loppu",
                "endings": ["eka  jatko", "toka"], "label": "1"}
-        prompt, choices, gold = finbench.TASKS["goldenswag"]["transform"](doc)
+        prompt, choices, gold = finbench.item_for("goldenswag", doc)
         self.assertTrue(prompt.startswith("Kerro loogisin jatko"))
         self.assertNotIn("[title]", prompt)            # replaced with ". "
         self.assertIn(". jatkoa Loppu", prompt)        # [title] -> ". ", ctx_b capitalised
@@ -83,22 +88,35 @@ class TransformTest(unittest.TestCase):
 
     def test_sib200_uses_dataset_choices_and_index(self):
         doc = {"text": "U", "choices": ["x", "y", "z"], "answer_idx": 2}
-        prompt, choices, gold = finbench.TASKS["sib200"]["transform"](doc)
+        prompt, choices, gold = finbench.item_for("sib200", doc)
         self.assertEqual((choices, gold), (["x", "y", "z"], 2))
         self.assertTrue(prompt.endswith("Aihe:"))
 
     def test_belebele_prompt_and_gold_index(self):
         doc = {"flores_passage": "P", "question": "Q", "mc_answer1": "a", "mc_answer2": "b",
                "mc_answer3": "c", "mc_answer4": "d", "correct_answer_num": "3"}
-        prompt, choices, gold = finbench.TASKS["belebele_fin"]["transform"](doc)
+        prompt, choices, gold = finbench.item_for("belebele_fin", doc)
         self.assertEqual((choices, gold), (["a", "b", "c", "d"], 2))
         self.assertIn("Tässä on teksti: P", prompt)
 
-    def test_every_task_declares_its_upstream_source(self):
-        for name, spec in finbench.TASKS.items():
-            self.assertIn("upstream", spec, name)
-            self.assertIn("cf/", spec["upstream"], name)
-            self.assertTrue(spec["doc_to_text"], name)
+    def test_mcf_changes_the_choice_set_for_belebele_only(self):
+        """mcf is not just a prompt swap: belebele scores the letters, arc_c the text."""
+        bele = {"flores_passage": "P", "question": "Q", "mc_answer1": "a", "mc_answer2": "b",
+                "mc_answer3": "c", "mc_answer4": "d", "correct_answer_num": "3"}
+        self.assertEqual(finbench.item_for("belebele_fin", bele, "mcf", "p0")[1],
+                         ["A", "B", "C", "D"])
+        arc = {"question": "K?", "choices": {"text": ["a", "b"], "label": ["A", "B"]},
+               "answerKey": "B"}
+        self.assertEqual(finbench.item_for("arc_c", arc, "mcf", "p0")[1], ["a", "b"])
+
+    def test_every_grid_cell_resolves_to_an_upstream_task(self):
+        for family in finbench.FAMILIES:
+            for formulation in finbench.FORMULATIONS:
+                for variant in finbench.VARIANTS:
+                    rel, task, _ = finbench._template(family, formulation, variant)
+                    self.assertTrue(rel.startswith(f"{family}/{formulation}/"), rel)
+                    self.assertTrue(rel.endswith(f"_{variant}.yaml"), rel)
+                    self.assertTrue(task, f"no task name for {rel}")
 
 
 class RunModelTest(unittest.TestCase):
@@ -121,7 +139,7 @@ class RunModelTest(unittest.TestCase):
              mock.patch.object(finbench, "fetch_rows",
                                side_effect=lambda task, data_dir, limit=None, quiet=False: []), \
              mock.patch.object(finbench, "build_items",
-                               side_effect=lambda task, rows, limit=None: ([], skips[task])), \
+                               side_effect=lambda task, rows, limit=None, **kw: ([], skips[task])), \
              mock.patch.object(finbench, "score", return_value=({}, {})):
             return finbench.run_model("poro2-8b-q8_0", self.gguf, "t",
                                       ["arc_c", "sib200"], 0, "d", 99, 4096, 16, False)
@@ -141,6 +159,65 @@ class RunModelTest(unittest.TestCase):
         self.assertEqual(s["model"], "Llama-Poro-2-8B-Instruct.Q8_0.gguf")
         self.assertNotIn("/home/", s["model"])
         self.assertNotIn("/halo", s["model"])
+
+    def test_summary_stamps_formulation_variant_and_upstream_commit(self):
+        with mock.patch.object(finbench, "RESULTS", self.results), \
+             mock.patch.object(finbench, "fetch_rows",
+                               side_effect=lambda task, data_dir, limit=None, quiet=False: []), \
+             mock.patch.object(finbench, "build_items",
+                               side_effect=lambda task, rows, limit=None, **kw: ([], 0)), \
+             mock.patch.object(finbench, "score", return_value=({}, {})):
+            finbench.run_model("poro2-8b-q8_0", self.gguf, "t", ["arc_c"], 0, "d",
+                               99, 4096, 16, False, formulation="mcf", variant="p3")
+        s = json.load(open(os.path.join(self.results, "finbench-t", "poro2-8b-q8_0",
+                                        "summary.json")))
+        self.assertEqual((s["formulation"], s["prompt_variant"]), ("mcf", "p3"))
+        self.assertEqual(s["upstream_commit"], finbench.UPSTREAM_COMMIT)
+
+
+class ConsolidateTest(unittest.TestCase):
+    """The tracked rollup must never be replaced by a pilot sample."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.results = os.path.join(self._tmp.name, "results")
+        self.run_dir = os.path.join(self.results, "finbench-fi-test", "cell")
+        os.makedirs(self.run_dir, exist_ok=True)
+        self.tracked_csv = os.path.join(self.results, "finbench-consolidated.csv")
+        self.tracked_md = os.path.join(self.results, "finbench-table.md")
+        for path in (self.tracked_csv, self.tracked_md):
+            with open(path, "w") as f:
+                f.write("sentinel\n")
+        with open(os.path.join(self.run_dir, "summary.json"), "w") as f:
+            json.dump({"cell": "cell", "model": "m.gguf", "run_id": "fi-test",
+                       "formulation": "mcf", "prompt_variant": "p2", "pilot_limit": 150,
+                       "tasks": {"arc_c": {"n": 150, "acc": 0.4, "acc_norm": 0.42,
+                                           "skipped": 0}}}, f)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_pilot_does_not_touch_the_tracked_rollup(self):
+        with mock.patch.object(finbench, "RESULTS", self.results):
+            finbench.consolidate("fi-test")
+        self.assertEqual(open(self.tracked_csv).read(), "sentinel\n")
+        self.assertEqual(open(self.tracked_md).read(), "sentinel\n")
+        pilot_csv = os.path.join(self.results, "finbench-fi-test", "pilot-consolidated.csv")
+        self.assertTrue(os.path.isfile(pilot_csv), "pilot rollup missing")
+        row = next(csv.DictReader(open(pilot_csv)))
+        self.assertEqual((row["formulation"], row["variant"]), ("mcf", "p2"))
+
+    def test_full_run_writes_the_tracked_rollup_with_combo_columns(self):
+        sp = os.path.join(self.run_dir, "summary.json")
+        data = json.load(open(sp))
+        data["pilot_limit"] = 0
+        json.dump(data, open(sp, "w"))
+        with mock.patch.object(finbench, "RESULTS", self.results):
+            finbench.consolidate("fi-test")
+        row = next(csv.DictReader(open(self.tracked_csv)))
+        self.assertEqual(row["formulation"], "mcf")
+        self.assertEqual(row["variant"], "p2")
+        self.assertIn("`mcf` formulation, prompt variant `p2`", open(self.tracked_md).read())
 
 
 if __name__ == "__main__":

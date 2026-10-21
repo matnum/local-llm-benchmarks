@@ -218,9 +218,12 @@ for why it needs its own scorer).
 
 Five models × the five task families that have a `cf` variant × prompt variant
 `p0`, zero-shot — 7,296 items per model, all scored: no skips, no context
-overflows, no unusable gold indices. Cells are **acc / acc_norm**; `acc_norm`
-divides the choice loglikelihood by its character length, exactly as the
-harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
+overflows, no unusable gold indices. The driver also supports the rest of the
+upstream grid — two formulations (`cf`, `mcf`) × five prompt variants
+(`p0`–`p4`), one pair per run (`--formulation` / `--variant`) — but the table
+below is `cf`/`p0`, the only pair swept so far. Cells are **acc / acc_norm**;
+`acc_norm` divides the choice loglikelihood by its character length, exactly as
+the harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
 
 | Model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
 |---|---|---|---|---|---|---|
@@ -310,7 +313,9 @@ What is pinned, and where:
 |---|---|
 | `scripts/run_sweep.py` | the sweep driver (stdlib + PyYAML) |
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib helpers: power/VRAM trace, TTFT probe |
-| `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML) |
+| `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML + Jinja2) |
+| `scripts/fetch_finbench_upstream.py` | refreshes the vendored upstream prompt templates |
+| `docs/finbench/` | upstream template snapshot (commit-pinned, sha256 per file) |
 | `scripts/make_charts.py` | regenerates the charts from the rollup (needs matplotlib) |
 | `scripts/make_social_preview.py` | regenerates the 1280×640 repository social card |
 | `tools/score_ll.cpp` | loglikelihood scorer for the FIN-bench axis, linked against the pinned llama.cpp |
@@ -380,8 +385,10 @@ metadata is in [CITATION.cff](CITATION.cff):
 
 ## Roadmap
 
-- **Finnish capability, wider** — the `mcf` formulation and prompt variants
-  `p1`–`p4`.
+- **Finnish capability, wider** — the driver now runs the full upstream grid
+  (`--formulation mcf`, `--variant p1`–`p4`, one pair per run, prompts rendered
+  from the vendored upstream templates). What remains is the GPU time to sweep
+  it and publish the formulation / prompt-variant comparison.
 - **An English/general quality axis** — strict-JSON extraction, function
   calling, and a GSM8K-style math subset over the same cells.
 - **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.

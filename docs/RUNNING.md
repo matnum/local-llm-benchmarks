@@ -255,8 +255,8 @@ CPU golden. It skips unless the binary and `Qwen3-4B-Q4_K_M.gguf` are present:
 /usr/bin/python3 -m unittest discover -s tests -p 'test_score_ll.py' -v
 ```
 
-Run (`scripts/finbench.py` stays stdlib + PyYAML; data comes from the HF datasets-server REST
-API and is cached resumably under `~/.cache/finbench/`):
+Run (`scripts/finbench.py` is stdlib + PyYAML + Jinja2; data comes from the HF datasets-server
+REST API and is cached resumably under `~/.cache/finbench/`):
 
 ```
 /usr/bin/python3 scripts/finbench.py --list
@@ -265,14 +265,33 @@ API and is cached resumably under `~/.cache/finbench/`):
 /usr/bin/python3 scripts/finbench.py --consolidate-only --run-id <id>
 ```
 
-**Scope:** the five families that have a `cf` variant — `arc_c`, `belebele_fin`, `goldenswag`,
-`scandisent`, `sib200` — at prompt variant `p0`, zero-shot: 7,296 items. `goldenswag` is
-scored on its `train` split (its test labels are withheld upstream), while the other four use
-`test`. `squad_fi` and
-`truthfulqa` exist upstream only as `gen`/`mc1`/`mc2`, so a cf-only run excludes them by
-construction rather than by omission. Per-task detail lands in
-`results/finbench-<run>/<cell>/<task>.json` (gitignored); the rollups
-`results/finbench-consolidated.csv` and `results/finbench-table.md` are tracked.
+**Scope and grid.** Upstream publishes the five `multiple_choice` families at two formulations
+(`cf`, `mcf`) × five prompt variants (`p0`–`p4`) = 50 task configs; the shipped table is
+`cf`/`p0` for all five. One invocation runs exactly **one** (formulation, variant) pair:
+
+```
+/usr/bin/python3 scripts/finbench.py --formulation mcf --variant p0 --model <cell> --run-id <id>
+```
+
+The prompts are not paraphrased: `scripts/fetch_finbench_upstream.py` vendors the upstream
+`doc_to_text` (and `description`) strings into `docs/finbench/upstream-<sha>.json`, and the
+driver renders them with Jinja2. `mcf` is not just a different prompt — the scored choice set
+changes for some families (belebele_fin scores the letters A–D, arc_c keeps the full option
+text); the choice set follows the upstream base yaml's `doc_to_choice`.
+`tests/test_finbench_upstream.py` pins the whole 5×2×5 grid, including two upstream quirks that
+are deliberately replicated (scandisent/mcf/p3 spells "positivinen"; belebele/mcf numbers the
+options 1–4 while scoring A–D).
+
+The five families: `arc_c`, `belebele_fin`, `goldenswag`, `scandisent`, `sib200` — 7,296 items
+per model at full split. `goldenswag` is scored on its `train` split (its test labels are
+withheld upstream), while the other four use `test`. `squad_fi` and `truthfulqa` exist upstream
+only as `gen`/`mc1`/`mc2`, so they are out of scope for this axis by construction rather than
+by omission. Per-task detail lands in `results/finbench-<run>/<cell>/<task>.json` (gitignored);
+`results/finbench-consolidated.csv` and `results/finbench-table.md` are tracked, and carry
+`formulation`/`variant` columns.
+
+**Pilots never touch the tracked rollup.** A `--pilot N` run writes `pilot-consolidated.csv`
+and `pilot-table.md` inside its own run directory; only a full run rewrites the tracked files.
 
 Metrics are the harness's own (`lm_eval/api/task.py`, `OUTPUT_TYPE == "multiple_choice"`):
 `acc` = argmax of the summed choice loglikelihood; `acc_norm` = argmax of the loglikelihood

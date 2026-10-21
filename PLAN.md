@@ -13,6 +13,7 @@ operator guide is [docs/RUNNING.md](RUNNING.md); the machine fingerprint is
 | D2 | **Pin the existing llama.cpp** (`~/.local/opt/llama.cpp` @ `5b59b83f4`). | No update/rebuild mid-project. `build-vulkan` = Backend A (reference), `build` = Backend B (ROCm/HIP). |
 | D3 | **Document the environment as verified, never assumed.** | OS, matrix, and hardware are stated as actually measured on the reference machine (CachyOS, on-disk matrix), not from the vendor sheet. |
 | D4 | **No HF token at the moment.** | Gated-repo cells stay in "future cells". Embedding models (bge-m3, nomic-embed-text) are ungated but still blocked by D1 → embeddings axis deferred. |
+| D5 | **FIN-bench prompts come from the upstream templates verbatim** (2026-10-21). `scripts/fetch_finbench_upstream.py` vendors the `doc_to_text`/`description` strings from `LumiOpen/lm-evaluation-harness` @ `finbench_v2` into `docs/finbench/upstream-<sha>.json`; the driver renders them with Jinja2 instead of hand-copying prose. | A prompt can never drift from upstream by transcription, and the whole 5×2×5 grid is reachable (`--formulation`, `--variant`). One pair per run; `summary.json` stamps formulation, variant and upstream commit. Tests pin the grid, including upstream quirks (scandisent/mcf/p3 "positivinen"; belebele/mcf scores A–D while numbering 1–4). A `--pilot` run writes its rollup inside the run directory so a sample can never replace the tracked table. |
 
 ## 2. Reference environment
 

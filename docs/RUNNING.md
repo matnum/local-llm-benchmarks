@@ -160,6 +160,13 @@ records `forced: true`).
   The `note` carries the actual repeat/request count (e.g. "streaming, mean of 3").
 - **`table.md`** — one table per (run, backend); the headline comparison view.
 
+**Charts are a separate step.** The driver never redraws them: after any `--consolidate`
+that changes `consolidated.csv`, run `/usr/bin/python3 scripts/make_charts.py` and commit
+`charts/`. Each PNG carries a fingerprint of its own inputs (PNG tEXt chunk
+`chart-stamp`: cell count + a digest of every plotted Vulkan/ROCm value), and
+`tests/test_charts.py` fails when a committed PNG's stamp no longer matches the rollup —
+so a stale figure cannot ship with fresh numbers.
+
 ## 7. Caveats (read before trusting a number)
 
 - **CPU power state is a measurement condition, and it is deliberately not pinned.** The

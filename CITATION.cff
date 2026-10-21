@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use these numbers or this harness, please cite this repository."
+title: "Local LLM Benchmark Suite: llama.cpp inference benchmarks on an AMD Ryzen AI Max+ 395 (Strix Halo)"
+type: software
+authors:
+  - family-names: Nummenpää
+    given-names: Matias
+    alias: matnum
+repository-code: "https://github.com/matnum/local-llm-benchmarks"
+url: "https://github.com/matnum/local-llm-benchmarks"
+license: MIT
+date-released: "2026-10-21"
+keywords:
+  - large language models
+  - inference benchmark
+  - llama.cpp
+  - Vulkan
+  - ROCm
+  - AMD Strix Halo
+  - unified memory
+  - Finnish NLP
+abstract: >-
+  Throughput, latency, memory, power and tokens-per-watt for ten
+  model/quantization cells on a 128 GB unified-memory AMD APU, measured with a
+  pinned llama.cpp build on both the Vulkan and ROCm backends, plus a
+  Finnish-capability axis on FIN-bench-v2 (cf formulation, prompt variant p0).
+  Raw run data, rollups, generation scripts and the full test suite are tracked
+  so every published number can be recomputed.

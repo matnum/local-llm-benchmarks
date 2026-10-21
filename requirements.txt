@@ -1,3 +1,5 @@
-# Dependency for scripts/run_sweep.py (matrix.yaml parser).
-# The other scripts (sampler.py, ttft_probe.py) are stdlib-only.
+# Dependencies for the harness. The sweep and FIN-bench drivers are stdlib +
+# PyYAML; matplotlib is only needed to draw/regenerate the README charts and to
+# run the chart-freshness tests.
 PyYAML>=6.0
+matplotlib>=3.8

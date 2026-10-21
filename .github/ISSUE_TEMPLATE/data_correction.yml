@@ -1,0 +1,47 @@
+name: Data correction
+description: A published number looks wrong, or does not match the tracked rollup
+title: "data: "
+labels: ["data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks — a benchmark repo lives or dies on its numbers being checkable.
+        Please point at both the published value and the rollup row it should
+        come from; the rollup is the source of truth.
+  - type: input
+    id: location
+    attributes:
+      label: Where is the number published?
+      placeholder: "README.md, results table row for poro2-70b-q4_k_m / rocm"
+    validations:
+      required: true
+  - type: input
+    id: observed
+    attributes:
+      label: Value shown
+      placeholder: "5.2"
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Value you expected (and why)
+      placeholder: "5.15 — the rocm tg512_bench_tps row in consolidated.csv"
+    validations:
+      required: true
+  - type: textarea
+    id: rollup
+    attributes:
+      label: Rollup row(s)
+      description: Paste the relevant line(s) from results/consolidated.csv or results/finbench-consolidated.csv, plus the run id.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Hardware/driver difference, suspected cause, or a link to a run.
+    validations:
+      required: false

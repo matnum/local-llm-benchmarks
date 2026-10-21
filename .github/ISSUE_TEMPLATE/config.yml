@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: How to run the benchmark
+    url: https://github.com/matnum/local-llm-benchmarks/blob/main/docs/RUNNING.md
+    about: Prerequisites, per-cell behaviour, caveats and the FIN-bench axis.

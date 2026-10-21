@@ -260,6 +260,38 @@ specifically); `goldenswag` is scored on its `train` split because its test
 labels are withheld upstream; and GPU-vs-CPU logprob numerics differ by up to
 ~0.12, harmless for a task score but able to flip a near-tie.
 
+### Formulation sensitivity — one `mcf` / `p0` probe
+
+The driver can also run the `mcf` formulation, which lists the options inside the
+prompt. One full-split probe (`fi-mcf-p0-20261021`, Poro 2 8B Q4_K_M) shows it is
+**not a like-for-like scale** and is reported as a negative result:
+
+| Task | cf/p0 acc | mcf/p0 acc | Δ |
+|---|---|---|---|
+| arc_c | 0.389 | 0.466 | +0.077 |
+| belebele_fin | 0.452 | 0.239 | −0.213 |
+| goldenswag | 0.579 | 0.335 | −0.244 |
+| scandisent | 0.922 | 0.811 | −0.111 |
+| sib200 | 0.306 | 0.372 | +0.067 |
+| **mean acc** | **0.530** | **0.445** | **−0.085** |
+
+Why the mean is misleading: `belebele_fin` collapses to chance (0.239 against
+0.25 for four options) and predicted "A" on all 900 items. A 200-item control
+scored the same items with bare and space-prefixed continuations and still picked
+"A" every time, so under `mcf` that task measures letter bias, not
+comprehension. `goldenswag`'s `acc_norm` falls to 0.199 — below chance — because
+upstream's `mcf` prompt asks for a letter while `doc_to_choice` remains the full
+endings. `arc_c` and `sib200` improve (the options in context help), `scandisent`
+degrades. So the `cf`/`p0` table above stays the published Finnish comparison;
+the `mcf` numbers are kept in [results/finbench-table.md](results/finbench-table.md)
+as a documented limitation rather than a capability score.
+
+One measurement caveat that applies to every column: choices are scored as bare
+continuations. Re-scoring 200 `scandisent` items with a space-prefixed choice
+(the way `lm_eval` shifts trailing whitespace) changed 7 predictions
+(0.940 → 0.965), so the boundary tokenisation is worth ~1–2 points on a binary
+task and does not explain the `mcf` collapse.
+
 ## Quick start
 
 The harness needs a Python 3 that can `import yaml` and, for the charts and the

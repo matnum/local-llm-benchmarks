@@ -24,3 +24,8 @@ fi-20261003,cf,p0,qwen3-8b-q4_k_m,belebele_fin,900,0.4344,0.41
 fi-20261003,cf,p0,qwen3-8b-q4_k_m,goldenswag,1000,0.389,0.344
 fi-20261003,cf,p0,qwen3-8b-q4_k_m,scandisent,2048,0.4995,0.4995
 fi-20261003,cf,p0,qwen3-8b-q4_k_m,sib200,1004,0.5149,0.6106
+fi-mcf-p0-20261021,mcf,p0,poro2-8b-q4_k_m,arc_c,2344,0.4663,0.4241
+fi-mcf-p0-20261021,mcf,p0,poro2-8b-q4_k_m,belebele_fin,900,0.2389,0.2389
+fi-mcf-p0-20261021,mcf,p0,poro2-8b-q4_k_m,goldenswag,1000,0.335,0.199
+fi-mcf-p0-20261021,mcf,p0,poro2-8b-q4_k_m,scandisent,2048,0.811,0.811
+fi-mcf-p0-20261021,mcf,p0,poro2-8b-q4_k_m,sib200,1004,0.3725,0.253

@@ -312,6 +312,7 @@ What is pinned, and where:
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib helpers: power/VRAM trace, TTFT probe |
 | `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML) |
 | `scripts/make_charts.py` | regenerates the charts from the rollup (needs matplotlib) |
+| `scripts/make_social_preview.py` | regenerates the 1280×640 repository social card |
 | `tools/score_ll.cpp` | loglikelihood scorer for the FIN-bench axis, linked against the pinned llama.cpp |
 | `matrix.yaml` | the benchmark matrix and the run-parameter defaults |
 | `docs/RUNNING.md` | operator guide: prerequisites, per-cell behaviour, caveats |

@@ -1,6 +1,10 @@
-# FIN-bench-v2 — Finnish capability (run `fi-20261003`)
+# FIN-bench-v2 — Finnish capability
 
-`cf` formulation, prompt variant `p0`, scored by `tools/score_ll` (pinned llama.cpp logits). Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of the choice text, `acc_norm` divides by the choice's character length, exactly as `lm_eval/api/task.py` does. Items per task: 900, 1000, 1004, 2048, 2344.
+Scored by `tools/score_ll` (pinned llama.cpp logits) from the upstream templates vendored in `docs/finbench/`. Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of the choice text, `acc_norm` divides by the choice's character length, exactly as `lm_eval/api/task.py` does. Items per task: 900, 1000, 1004, 2048, 2344. Pilots are excluded.
+
+## `cf` / `p0`
+
+Run `fi-20261003`.
 
 | model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
 |---|---|---|---|---|---|---|

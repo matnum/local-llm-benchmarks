@@ -88,6 +88,10 @@ class ReadmeTablesTest(unittest.TestCase):
         fin = {}
         with open(FIN_ROLLUP, newline="") as f:
             for r in csv.DictReader(f):
+                # The README publishes the cf/p0 pair; other pairs live in the CSV
+                # and in results/finbench-table.md.
+                if r.get("formulation", "cf") != "cf" or r.get("variant", "p0") != "p0":
+                    continue
                 fin[(r["cell"], r["task"])] = (float(r["acc"]), float(r["acc_norm"]))
 
         rows = _rows(self.text, FIN_HEADER)

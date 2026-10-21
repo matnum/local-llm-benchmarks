@@ -399,83 +399,91 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
     return summaries
 
 
-def consolidate(run_id):
-    """Roll every model of this run into a CSV + markdown table (one row per model/task)."""
-    rows, models, pilot = [], [], 0
-    combos = set()
-    raw = {}                        # cell -> {task: unrounded acc}, for the mean column
-    base = f"{RESULTS}/finbench-{run_id}"
-    if not os.path.isdir(base):
-        return
-    for cell in sorted(os.listdir(base)):
-        sp = os.path.join(base, cell, "summary.json")
-        if not os.path.isfile(sp):
+def _collect_full_runs(results_dir):
+    """Rows from every full run on disk: (run_id, formulation, variant, cell, task, ...).
+
+    Pilots are skipped outright — they score the first N items per task and must
+    never be published next to full-split numbers.
+    """
+    rows = []
+    for base in sorted(glob.glob(os.path.join(results_dir, "finbench-*"))):
+        if not os.path.isdir(base):
             continue
-        s = json.load(open(sp, encoding="utf-8"))
-        formulation = s.get("formulation", "cf")          # older runs predate the stamp
-        variant = s.get("prompt_variant", "p0")
-        combos.add((formulation, variant))
-        models.append(cell)
-        pilot = max(pilot, s.get("pilot_limit") or 0)
-        raw[cell] = {task: d["acc"] for task, d in s["tasks"].items()}
-        for task, d in s["tasks"].items():
-            rows.append({"run_id": run_id, "formulation": formulation, "variant": variant,
-                         "cell": cell, "task": task,
-                         "n": d["n"], "acc": round(d["acc"], 4),
-                         "acc_norm": round(d["acc_norm"], 4)})
+        for cell in sorted(os.listdir(base)):
+            sp = os.path.join(base, cell, "summary.json")
+            if not os.path.isfile(sp):
+                continue
+            with open(sp, encoding="utf-8") as f:
+                s = json.load(f)
+            if (s.get("pilot_limit") or 0) > 0:
+                continue
+            run_id = s.get("run_id") or os.path.basename(base)[len("finbench-"):]
+            formulation = s.get("formulation", "cf")      # older runs predate the stamp
+            variant = s.get("prompt_variant", "p0")
+            for task, d in s["tasks"].items():
+                rows.append({"run_id": run_id, "formulation": formulation,
+                             "variant": variant, "cell": cell, "task": task,
+                             "n": d["n"], "acc": round(d["acc"], 4),
+                             "acc_norm": round(d["acc_norm"], 4), "_raw": d["acc"]})
+    return rows
+
+
+def consolidate(_run_id=None):
+    """Rebuild the tracked FIN-bench rollups from every full run on disk.
+
+    One table per (formulation, variant) pair and one CSV keyed by
+    run_id/formulation/variant/cell/task, so publishing a second pair adds rows
+    instead of replacing the first. `_run_id` is accepted for CLI compatibility
+    and ignored.
+    """
+    rows = _collect_full_runs(RESULTS)
     if not rows:
+        print("no full FIN-bench runs on disk — tracked rollups left untouched")
         return
-    # A pilot must never overwrite the tracked rollup: it is a sample of the first
-    # N items per task, and publishing it as the Finnish table would silently
-    # replace real numbers with a partial run.
-    if pilot:
-        path = os.path.join(base, "pilot-consolidated.csv")
-        md_path = os.path.join(base, "pilot-table.md")
-        print(f"  PILOT run (first {pilot} items/task): rollup written inside the run "
-              f"directory, tracked results/finbench-consolidated.csv left untouched")
-    else:
-        path = f"{RESULTS}/finbench-consolidated.csv"
-        md_path = f"{RESULTS}/finbench-table.md"
+    path = f"{RESULTS}/finbench-consolidated.csv"
+    md_path = f"{RESULTS}/finbench-table.md"
     fields = ["run_id", "formulation", "variant", "cell", "task", "n", "acc", "acc_norm"]
     with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
-        w.writerows(rows)
+        w.writerows(sorted(rows, key=lambda r: (r["formulation"], r["variant"],
+                                                r["run_id"], r["cell"], r["task"])))
     tasks = sorted({r["task"] for r in rows})
     ns = sorted({r["n"] for r in rows})
-    if len(combos) == 1:
-        formulation, variant = combos.pop()
-        combo_text = f"`{formulation}` formulation, prompt variant `{variant}`"
-    else:
-        combo_text = "mixed formulations/variants: " + ", ".join(
-            f"{f}/{v}" for f, v in sorted(combos))
-    md = [f"# FIN-bench-v2 — Finnish capability (run `{run_id}`)", ""]
-    if pilot:
-        md += [f"> **PILOT — first {pilot} items per task only.** Not comparable with a full "
-               f"run; a task's score can move several points on the full split.", ""]
-    md += [f"{combo_text}, scored by `tools/score_ll` (pinned "
-           f"llama.cpp logits). Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of "
-           f"the choice text, `acc_norm` divides by the choice's character length, exactly as "
-           f"`lm_eval/api/task.py` does. Items per task: "
-           + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns)) + ".", "",
-           "| model | " + " | ".join(tasks) + " | mean acc |",
-           "|---" * (len(tasks) + 2) + "|"]
-    # ranked by mean acc — a capability table is read as a ranking, and the
-    # alphabetical order (as cell ids happen to be named) hides exactly that.
-    ranked = []
-    for cell in models:
-        vals = {r["task"]: r for r in rows if r["cell"] == cell}
-        # M-5: average the unrounded accuracies. The CSV stores 4-decimal values,
-        # so averaging those rounds a second time for no reason.
-        accs = [raw[cell][t] for t in tasks if t in raw[cell]]
-        ranked.append((sum(accs) / len(accs), cell, vals))
-    for mean, cell, vals in sorted(ranked, reverse=True):
-        md.append(f"| {cell} | " + " | ".join(
-            f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
-            for t in tasks)
-            + f" | {mean:.3f} |")
-    open(md_path, "w", encoding="utf-8").write("\n".join(md) + "\n")
-    print(f"\nwrote {path} and {md_path}")
+    grouped = collections.defaultdict(list)
+    for r in rows:
+        grouped[(r["formulation"], r["variant"])].append(r)
+    md = ["# FIN-bench-v2 — Finnish capability", "",
+          "Scored by `tools/score_ll` (pinned llama.cpp logits) from the upstream "
+          "templates vendored in `docs/finbench/`. Cells are **acc / acc_norm**; `acc` = "
+          "argmax loglikelihood of the choice text, `acc_norm` divides by the choice's "
+          "character length, exactly as `lm_eval/api/task.py` does. Items per task: "
+          + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns))
+          + ". Pilots are excluded.", ""]
+    for (formulation, variant), combo_rows in sorted(grouped.items()):
+        run_ids = sorted({r["run_id"] for r in combo_rows})
+        md += [f"## `{formulation}` / `{variant}`", "",
+               f"Run `{', '.join(run_ids)}`.", "",
+               "| model | " + " | ".join(tasks) + " | mean acc |",
+               "|---" * (len(tasks) + 2) + "|"]
+        by_cell = collections.defaultdict(dict)
+        for r in combo_rows:
+            by_cell[r["cell"]][r["task"]] = r
+        ranked = []
+        for cell, vals in by_cell.items():
+            # average the unrounded accuracies (the CSV stores 4-decimal values)
+            accs = [vals[t]["_raw"] for t in tasks if t in vals]
+            ranked.append((sum(accs) / len(accs), cell, vals))
+        for mean, cell, vals in sorted(ranked, reverse=True):
+            md.append(f"| {cell} | " + " | ".join(
+                f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
+                for t in tasks) + f" | {mean:.3f} |")
+        md.append("")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(md).rstrip() + "\n")
+    print(f"wrote {path} and {md_path} "
+          f"({len(grouped)} formulation/variant pairs, "
+          f"{len({r['run_id'] for r in rows})} runs)")
 
 
 def main():

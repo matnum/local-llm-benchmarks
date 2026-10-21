@@ -176,7 +176,7 @@ class RunModelTest(unittest.TestCase):
 
 
 class ConsolidateTest(unittest.TestCase):
-    """The tracked rollup must never be replaced by a pilot sample."""
+    """Rollups: pilots never publish, and a second pair adds rows, not replaces."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -188,36 +188,42 @@ class ConsolidateTest(unittest.TestCase):
         for path in (self.tracked_csv, self.tracked_md):
             with open(path, "w") as f:
                 f.write("sentinel\n")
-        with open(os.path.join(self.run_dir, "summary.json"), "w") as f:
-            json.dump({"cell": "cell", "model": "m.gguf", "run_id": "fi-test",
-                       "formulation": "mcf", "prompt_variant": "p2", "pilot_limit": 150,
-                       "tasks": {"arc_c": {"n": 150, "acc": 0.4, "acc_norm": 0.42,
-                                           "skipped": 0}}}, f)
 
     def tearDown(self):
         self._tmp.cleanup()
 
-    def test_pilot_does_not_touch_the_tracked_rollup(self):
+    def _write_summary(self, run_id, formulation, variant, pilot, cell="cell"):
+        run_dir = os.path.join(self.results, f"finbench-{run_id}", cell)
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "summary.json"), "w") as f:
+            json.dump({"cell": cell, "model": "m.gguf", "run_id": run_id,
+                       "formulation": formulation, "prompt_variant": variant,
+                       "pilot_limit": pilot,
+                       "tasks": {"arc_c": {"n": 100 if not pilot else pilot,
+                                           "acc": 0.4, "acc_norm": 0.42, "skipped": 0}}}, f)
+
+    def test_pilot_never_reaches_the_tracked_rollup(self):
+        self._write_summary("fi-test", "mcf", "p2", pilot=150)
         with mock.patch.object(finbench, "RESULTS", self.results):
             finbench.consolidate("fi-test")
         self.assertEqual(open(self.tracked_csv).read(), "sentinel\n")
         self.assertEqual(open(self.tracked_md).read(), "sentinel\n")
-        pilot_csv = os.path.join(self.results, "finbench-fi-test", "pilot-consolidated.csv")
-        self.assertTrue(os.path.isfile(pilot_csv), "pilot rollup missing")
-        row = next(csv.DictReader(open(pilot_csv)))
-        self.assertEqual((row["formulation"], row["variant"]), ("mcf", "p2"))
+        self.assertEqual(sorted(os.listdir(self.run_dir)), ["summary.json"],
+                         "nothing should be written for a pilot-only tree")
 
-    def test_full_run_writes_the_tracked_rollup_with_combo_columns(self):
-        sp = os.path.join(self.run_dir, "summary.json")
-        data = json.load(open(sp))
-        data["pilot_limit"] = 0
-        json.dump(data, open(sp, "w"))
+    def test_full_runs_accumulate_and_combo_columns_are_written(self):
+        self._write_summary("fi-mcf", "mcf", "p2", pilot=0, cell="cell_a")
+        self._write_summary("fi-cf", "cf", "p0", pilot=0, cell="cell_b")
         with mock.patch.object(finbench, "RESULTS", self.results):
-            finbench.consolidate("fi-test")
-        row = next(csv.DictReader(open(self.tracked_csv)))
-        self.assertEqual(row["formulation"], "mcf")
-        self.assertEqual(row["variant"], "p2")
-        self.assertIn("`mcf` formulation, prompt variant `p2`", open(self.tracked_md).read())
+            finbench.consolidate()
+        rows = list(csv.DictReader(open(self.tracked_csv)))
+        combos = {(r["formulation"], r["variant"]) for r in rows}
+        self.assertEqual(combos, {("mcf", "p2"), ("cf", "p0")})
+        md = open(self.tracked_md).read()
+        self.assertIn("## `cf` / `p0`", md)
+        self.assertIn("## `mcf` / `p2`", md)
+        # the pilot cell never appears
+        self.assertNotIn("| cell |", md)
 
 
 if __name__ == "__main__":

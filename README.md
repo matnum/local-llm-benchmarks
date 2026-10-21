@@ -121,8 +121,8 @@ MoE models (a few billion *active* parameters) are still ~5–7× faster at gene
 
 ### Next-round cells (2026-10-03)
 
-Four downloaded models added to `matrix.yaml` as the next-round cells, swept the same
-way. The charts above now cover all nine cells including these; the full per-cell metrics
+Five downloaded models added to `matrix.yaml` as the next-round cells, swept the same
+way. The charts above now cover all ten cells including these; the full per-cell metrics
 are in [results/table.md](results/table.md).
 
 | Cell | Quant | Backend | pp2048 t/s | tg512 bench t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |

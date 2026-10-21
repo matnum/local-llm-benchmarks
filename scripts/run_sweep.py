@@ -494,7 +494,7 @@ def harness_commit(repo):
 
     Stamping HEAD made the stamp stale on the very next commit, and because
     --consolidate rewrites the stamp, every subsequent landing dirtied the tracked
-    rollup again (REVIEW.md M-3 recurred on each commit). The numbers are fixed by
+    rollup again (finding M-3 of the independent review recurred on each commit). The numbers are fixed by
     the driver code, so record that code's last change: unrelated commits then
     leave the rollup byte-identical.
     """
@@ -575,7 +575,7 @@ def consolidate(repo=REPO):
     # M7: record which harness build produced the rollup. run.json stamps the
     # capture-time harness; this stamps the driver code that generated the numbers,
     # so the tracked rollup carries its own provenance without going stale on every
-    # unrelated commit (stamping HEAD did; REVIEW.md M-3 kept recurring).
+    # unrelated commit (stamping HEAD did; review finding M-3 kept recurring).
     rollup_commit = harness_commit(repo) or "unknown"
     md = ["# Results", "",
           f"> Rollup built by harness `{rollup_commit[:12]}`. Sustained = llama-server "

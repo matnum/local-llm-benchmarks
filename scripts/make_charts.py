@@ -20,7 +20,9 @@ Design notes — why dumbbells rather than grouped bars:
 """
 import collections
 import csv
+import hashlib
 import os
+import struct
 
 import yaml
 
@@ -42,6 +44,42 @@ CEILING_BW = 256.0          # GB/s, README: memory bandwidth of the box
 METRIC_COLORS = {"tg512_bench_tps": "#8172B2", "pp2048_bench_tps": "#64B5CD"}
 METRIC_LABELS = {"tg512_bench_tps": "generation (tg512)",
                  "pp2048_bench_tps": "prefill (pp2048)"}
+
+# Each figure carries a fingerprint of what it was drawn from, as a PNG tEXt
+# chunk. Regenerating the rollup without re-running this script changes the
+# fingerprint and `tests/test_charts.py` fails — the data-derived list test
+# alone cannot tell a stale committed PNG from a fresh one.
+STAMP_KEY = "chart-stamp"
+
+
+def chart_stamp(cells, vals, metrics):
+    """Fingerprint of a figure's data: every plotted cell and both values.
+
+    Order-independent on purpose: the efficiency chart plots a different row
+    order from the size-ordered ones, and row order already follows the values.
+    """
+    h = hashlib.sha256()
+    for cell in sorted(cells):
+        for metric in metrics:
+            h.update(f"{cell}\t{metric}\t{vals[(cell, 'vulkan')][metric]:.6f}\t"
+                     f"{vals[(cell, 'rocm')][metric]:.6f}\n".encode())
+    return f"cells={len(cells)};sha256={h.hexdigest()[:16]}"
+
+
+def png_stamp(path):
+    """Read back the chart-stamp written into a PNG, or None if it has none."""
+    with open(path, "rb") as f:
+        data = f.read()
+    pos = 8  # past the 8-byte PNG signature
+    while pos + 8 <= len(data):
+        length, ctype = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + length]
+        if ctype == b"tEXt":
+            key, _, value = body.partition(b"\x00")
+            if key.decode("latin-1") == STAMP_KEY:
+                return value.decode("latin-1")
+        pos += 12 + length
+    return None
 
 
 def load_matrix():
@@ -145,7 +183,8 @@ def chart_metric(vals, cells, meta, metric, title, xlabel, fmt, filename):
     dumbbell(ax, vals, cells, meta, metric, fmt)
     finish(ax, title, xlabel)
     path = os.path.join(OUT, filename)
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    fig.savefig(path, dpi=150, bbox_inches="tight",
+                metadata={STAMP_KEY: chart_stamp(cells, vals, (metric,))})
     plt.close(fig)
     print(f"wrote {path} ({len(cells)} cells)")
     return path
@@ -181,7 +220,9 @@ def chart_delta(vals, cells, meta, filename):
                                                "positive = ROCm faster · negative = Vulkan faster",
            legend_loc="lower right")
     path = os.path.join(OUT, filename)
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    fig.savefig(path, dpi=150, bbox_inches="tight",
+                metadata={STAMP_KEY: chart_stamp(
+                    cells, vals, ("tg512_bench_tps", "pp2048_bench_tps"))})
     plt.close(fig)
     print(f"wrote {path} ({len(cells)} cells)")
     return path

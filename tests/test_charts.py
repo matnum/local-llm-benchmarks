@@ -27,6 +27,15 @@ BACKENDS = ("vulkan", "rocm")
 EXPECTED_CHARTS = ["backend_delta.png", "generation_tps.png",
                    "prefill_tps.png", "tokens_per_watt.png"]
 
+# Which rollup metric(s) each figure draws — the stamp is per figure, so a
+# re-consolidated rollup invalidates exactly the charts it should.
+STAMP_METRICS = {
+    "generation_tps.png": ("tg512_bench_tps",),
+    "prefill_tps.png": ("pp2048_bench_tps",),
+    "tokens_per_watt.png": ("tok_per_w",),
+    "backend_delta.png": ("tg512_bench_tps", "pp2048_bench_tps"),
+}
+
 
 @unittest.skipIf(make_charts is None, "matplotlib/PyYAML not installed")
 class ChartDataTest(unittest.TestCase):
@@ -90,6 +99,23 @@ class ChartDataTest(unittest.TestCase):
         plt.close(fig)
         self.assertEqual(len(ys), 2, f"both backends drawn at one y: {ys}")
 
+    def test_committed_charts_carry_a_current_stamp(self):
+        """The committed PNG must have been drawn from the current rollup.
+
+        ``test_every_two_backend_cell_is_plotted`` only checks the *list* the
+        generator would use, so a PNG left over from an earlier consolidation
+        passed it while showing ten cells' worth of old numbers. Each figure now
+        embeds a fingerprint of its own inputs; recompute it and compare.
+        """
+        for name, metrics in STAMP_METRICS.items():
+            with self.subTest(chart=name):
+                path = os.path.join(make_charts.OUT, name)
+                self.assertTrue(os.path.isfile(path), f"missing committed chart {name}")
+                want = make_charts.chart_stamp(self.cells, self.vals, metrics)
+                self.assertEqual(
+                    make_charts.png_stamp(path), want,
+                    f"charts/{name} is stale — run scripts/make_charts.py and commit it")
+
     def test_main_writes_all_charts_as_real_pngs(self):
         """End-to-end, into a temp dir so the tracked PNGs are never touched."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,6 +129,10 @@ class ChartDataTest(unittest.TestCase):
                 width, height = struct.unpack(">II", head[16:24])
                 self.assertGreater(width, 600, f"{name} suspiciously narrow")
                 self.assertGreater(height, 400, f"{name} suspiciously short")
+                self.assertEqual(
+                    make_charts.png_stamp(os.path.join(tmp, name)),
+                    make_charts.chart_stamp(self.cells, self.vals, STAMP_METRICS[name]),
+                    f"{name} written without a matching stamp")
 
 
 if __name__ == "__main__":

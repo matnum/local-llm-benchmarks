@@ -236,7 +236,7 @@ GGUF files and llama.cpp build, then follow [docs/RUNNING.md](docs/RUNNING.md).
 | `docs/RUNNING.md` | operator guide |
 | `docs/env.md` | machine fingerprint |
 | `results/consolidated.csv`, `results/table.md` | tracked rollups |
-| `tests/` | stdlib-unittest suite (parser, consolidate, defaults wiring, run_model) |
+| `tests/` | stdlib-unittest suite (harness parser/consolidate/defaults, FIN-bench metrics + transforms, score_ll golden, chart freshness, README-range guards) |
 | `PLAN.md`, `REVIEW.md` | methodology decisions + independent review |
 
 ## Roadmap

@@ -18,6 +18,25 @@ still green (28 tests).
 > are re-confirmed here as resolved. The new findings below concern the FIN-bench work and two
 > README-analysis statements.
 
+> **Resolution status (builder, 2026-10-21, verified at `baf4011`).** Every finding in
+> §3–§5 is closed on `main`; re-checked against the code, the rollup and the suite (35
+> tests, no skips on the reference machine): I-1 (the README now ranks Poro 2 70B first
+> and credits EuroLLM-9B only against the 8B, 0.604 vs 0.550/0.530), I-2
+> (`1.7–15.5%`, Vulkan denominator — the 18.3% divided by ROCm — now pinned by
+> `tests/test_readme_ranges.py`), I-3 (the Q4_K_M twin is in `scripts/download_models.sh`,
+> on disk, swept in `fi-20261003`, and the README caveat is quant-matched), M-1
+> (per-task `skipped`, `scripts/finbench.py:328-337`), M-2 (basename only,
+> `scripts/finbench.py:345`), M-3 (stamp `4853977`, and no driver change since), M-4
+> (`goldenswag`'s `train` split documented in `docs/RUNNING.md` §9), and missing
+> evidence 1 (`tests/test_score_ll.py`: golden loglikelihoods plus choice-order and
+> KV-rollback invariants; it skips when the scorer binary or fixture GGUF is absent).
+> Missing evidence 2 is partly closed: all six hand-typed ranges — first- and
+> next-round blocks alike — are asserted against `consolidated.csv` by
+> `tests/test_readme_ranges.py`, and `tests/test_charts.py` now fails when a committed
+> chart carries a fingerprint from an older rollup. M-5 is unchanged by design
+> (≤0.0001, cosmetic). The verdict and method above remain the reviewer's snapshot of
+> 2026-10-04 at `b334f30`.
+
 ---
 
 ## 1. Overall assessment

@@ -61,6 +61,22 @@ class DefaultsWiredTest(unittest.TestCase):
             self.assertTrue(cell["file"].startswith("~/"), cell["file"])
             self.assertNotIn("/home/", cell["file"])
 
+    def test_kv_cache_type_is_selectable_and_defaults_to_the_old_setting(self):
+        """--kv exists, defaults to q8_0 (the historical protocol) and rejects junk.
+
+        TTFT on some Vulkan cells is dominated by quantised-KV bookkeeping, so the
+        probe has to be able to run with f16 KV and say which it used (RUNNING §7).
+        """
+        p = run_sweep.build_parser({})
+        self.assertEqual(p.parse_args([]).kv, "q8_0")
+        self.assertEqual(p.parse_args(["--kv", "f16"]).kv, "f16")
+        with self.assertRaises(SystemExit):
+            p.parse_args(["--kv", "q4_0"])
+
+    def test_stack_versions_are_reportable(self):
+        """D7: numbers are stack-stamped, so the driver must report the Mesa string."""
+        self.assertIn("Mesa", run_sweep.mesa_version())
+
 
 if __name__ == "__main__":
     unittest.main()

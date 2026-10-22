@@ -28,6 +28,7 @@ import csv
 import glob
 import json
 import os
+import platform
 import re
 import signal
 import statistics
@@ -239,11 +240,11 @@ def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None,
 
 
 def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None,
-               threads=16, ngl=99, warmup=1):
+               threads=16, ngl=99, warmup=1, kv="q8_0"):
     srv = subprocess.Popen(
         [f"{binpath}/llama-server", "-m", cell["file"], "--host", "127.0.0.1",
          "--port", str(port), "-c", str(ctx), "-ngl", str(ngl), "-t", str(threads),
-         "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0", "-np", "1",
+         "-fa", "on", "-ctk", kv, "-ctv", kv, "-np", "1",
          "--alias", cell["id"]],
         stdout=open(f"{cdir}/server.log", "w"), stderr=subprocess.STDOUT,
         start_new_session=True, env=env)
@@ -313,6 +314,10 @@ def build_parser(defaults):
                     help="untimed warmup requests before the timed TTFT probe")
     ap.add_argument("--power-hz", type=int, default=int(defaults.get("power_sample_hz", 5)),
                     help="resource sampler rate (power_sample_hz)")
+    ap.add_argument("--kv", choices=("q8_0", "f16"), default="q8_0",
+                    help="KV cache type for the server phase (-ctk/-ctv); q8_0 is the "
+                         "historical default, f16 avoids the quantised-KV bookkeeping "
+                         "that inflates TTFT on some Vulkan cells (RUNNING §7)")
     ap.add_argument("--force", action="store_true", help="skip idle check")
     ap.add_argument("--rocm-override", action="store_true",
                     help="set HSA_OVERRIDE_GFX_VERSION=11.5.0")
@@ -376,6 +381,9 @@ def main():
             "pp_tokens": pp_tokens,
             "ctx_server": args.ctx,
             "ctx_bench": "model-default (4096)",
+            "kv_cache": args.kv,
+            "kernel": platform.release(),
+            "mesa": mesa_version(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
             "forced": args.force}
@@ -437,7 +445,7 @@ def main():
             log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
             ttft, p0, p1 = probe_cell(env_binpath(args), cell, args.ctx, args.port,
                                       cdir, args.repeats, args.tg_tokens, env,
-                                      args.threads, args.ngl, args.warmup)
+                                      args.threads, args.ngl, args.warmup, args.kv)
             phases["probe_start"], phases["probe_end"] = p0, p1
             log(f"  probe: ttft={ttft['ttft_ms_mean']}ms gen={ttft['gen_tps_mean']} t/s")
         finally:
@@ -454,7 +462,7 @@ def main():
         tg_srv = ttft["gen_tps_mean"]
         pw = (res["probe_window"] or {}).get("power_w_mean")
         summary = {
-            "cell": cell["id"], "backend": args.backend, "run": run_id,
+            "cell": cell["id"], "backend": args.backend, "run": run_id, "kv": args.kv,
             "model": cell["model"], "quant": cell["quant"], "arch": cell["arch"],
             "size_gib": cell["size_gib"], "bench": bench, "ttft": ttft,
             "resources": res,
@@ -510,6 +518,17 @@ def harness_commit(repo):
         out = subprocess.run(["git", "-C", repo, "log", "-1", "--format=%H", "--", *DRIVERS],
                              capture_output=True, text=True).stdout.strip()
         return out or git_head(repo) or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def mesa_version():
+    """Best-effort RADV/Mesa version for provenance (D7: numbers are stack-stamped)."""
+    try:
+        out = subprocess.run(["vulkaninfo", "--summary"], capture_output=True, text=True,
+                             timeout=20).stdout
+        m = re.search(r"driverInfo\s*=\s*(Mesa[^\n]+)", out)
+        return m.group(1).strip() if m else "unknown"
     except Exception:
         return "unknown"
 

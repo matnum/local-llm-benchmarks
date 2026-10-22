@@ -462,7 +462,15 @@ def main():
         }
         json.dump(summary, open(f"{cdir}/cell.json", "w"), indent=1)
 
-    consolidate()
+    if tracks_rollup([c["id"] for c in cells], [c["id"] for c in matrix["cells"]]):
+        consolidate()
+    else:
+        # A one-cell probe must not rewrite the published rollup: consolidate()
+        # scans every run dir, so a partial run's rows would silently become the
+        # "latest" value for that cell in consolidated.csv, table.md, the charts
+        # and every README number pinned to them.
+        log(f"partial sweep ({len(cells)}/{len(matrix['cells'])} cells): tracked rollup, "
+            f"table and charts left untouched (cell.json in the run dir has the numbers)")
     # M8 (tracked, not yet implemented): PLAN §3 says every sweep is "git commit +
     # tag run-YYYYMMDD-N" with llama.cpp commit + env fingerprint, and fixes the CPU
     # governor. The driver does NOT do this yet. Until implemented, run manually after
@@ -504,6 +512,11 @@ def harness_commit(repo):
         return out or git_head(repo) or "unknown"
     except Exception:
         return "unknown"
+
+
+def tracks_rollup(selected_ids, all_ids):
+    """Only a sweep covering the whole matrix may rewrite the tracked rollup."""
+    return set(selected_ids) == set(all_ids)
 
 
 def consolidate(repo=REPO):

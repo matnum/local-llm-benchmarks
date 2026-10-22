@@ -108,5 +108,23 @@ class ConsolidateTest(unittest.TestCase):
         self.assertIn("cellB", md)
 
 
+class RollupOwnershipTest(unittest.TestCase):
+    """Only a full sweep may rewrite the published rollup.
+
+    consolidate() scans every run dir, so a one-cell probe (--cells X) would make
+    that run the "latest" value for X in consolidated.csv, table.md, the charts and
+    every README number pinned to them. That happened once during the TTFT
+    investigation; the driver now refuses to consolidate a partial sweep.
+    """
+
+    def test_full_matrix_tracks_the_rollup(self):
+        self.assertTrue(run_sweep.tracks_rollup(["a", "b", "c"], ["a", "b", "c"]))
+        self.assertTrue(run_sweep.tracks_rollup(["b", "a"], ["a", "b"]))
+
+    def test_subset_and_superset_do_not(self):
+        self.assertFalse(run_sweep.tracks_rollup(["a"], ["a", "b", "c"]))
+        self.assertFalse(run_sweep.tracks_rollup(["a", "b", "c", "d"], ["a", "b", "c"]))
+
+
 if __name__ == "__main__":
     unittest.main()

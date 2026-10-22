@@ -410,6 +410,11 @@ def main():
             "mesa": mesa_version(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
+            # M-2: a --cells selection that does not cover the matrix is a probe.
+            # Stamp it so a later full sweep's consolidate() cannot fold its rows
+            # into the published rollup as the "latest" value for those cells.
+            "partial": not tracks_rollup([c["id"] for c in cells],
+                                         [c["id"] for c in matrix["cells"]]),
             "forced": args.force}
     json.dump(meta, open(f"{rdir}/run.json", "w"), indent=1)
     open_sweep_log(f"{rdir}/sweep.log")
@@ -567,8 +572,16 @@ def consolidate(repo=REPO):
     rows = []
     for rj in sorted(glob.glob(f"{repo}/results/run-*/**/run.json", recursive=True)):
         rd_ = os.path.dirname(rj)
-        # run.json only locates the run dir (via the glob above); its contents are
-        # not needed here, so don't open it.
+        # M-2: skip a partial sweep (--cells ...). The driver refuses to
+        # consolidate one itself, but every later full sweep calls consolidate(),
+        # and without this the probe's rows come back as the "latest" value for
+        # the cells it touched (run-20261022-0917 did exactly that).
+        try:
+            with open(rj) as f:
+                if json.load(f).get("partial"):
+                    continue
+        except (OSError, ValueError):
+            pass
         for cj in sorted(glob.glob(f"{rd_}/*/cell.json")):
             with open(cj) as f:
                 s = json.load(f)

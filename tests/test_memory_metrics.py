@@ -198,5 +198,50 @@ class RollupMemMetricTest(unittest.TestCase):
         self.assertEqual(m["vram_peak_gib"]["note"], "")
 
 
+class PartialRunExclusionTest(unittest.TestCase):
+    """M-2: a --cells probe must never become a published row.
+
+    The driver already refuses to consolidate a partial sweep, but consolidate()
+    scans every run dir, so the next full sweep used to fold the probe's rows back
+    in as the "latest" value for the cells it touched (run-20261022-0917).
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = self._tmp.name
+        os.makedirs(os.path.join(self.repo, "results"), exist_ok=True)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write_run(self, run_id, partial):
+        bdir = os.path.join(self.repo, "results", run_id, "vulkan")
+        cdir = os.path.join(bdir, "cellA")
+        os.makedirs(cdir, exist_ok=True)
+        meta = {"run_id": run_id, "backend": "vulkan"}
+        if partial is not None:
+            meta["partial"] = partial
+        with open(os.path.join(bdir, "run.json"), "w") as f:
+            json.dump(meta, f)
+        with open(os.path.join(cdir, "cell.json"), "w") as f:
+            json.dump(_cell_json("cellA", "vulkan", run_id, mem_gib_max=60.5), f)
+
+    def _run_ids(self):
+        with open(os.path.join(self.repo, "results", "consolidated.csv"), newline="") as f:
+            return {r["run_id"] for r in csv.DictReader(f)}
+
+    def test_partial_run_is_skipped(self):
+        self._write_run("run-full", partial=False)
+        self._write_run("run-probe", partial=True)
+        run_sweep.consolidate(repo=self.repo)
+        self.assertEqual(self._run_ids(), {"run-full"})
+
+    def test_run_without_the_flag_still_rolls_up(self):
+        # Runs recorded before the flag existed carry no key and must keep working.
+        self._write_run("run-old", partial=None)
+        run_sweep.consolidate(repo=self.repo)
+        self.assertEqual(self._run_ids(), {"run-old"})
+
+
 if __name__ == "__main__":
     unittest.main()

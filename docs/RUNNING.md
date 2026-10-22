@@ -33,15 +33,20 @@ pip install -r requirements.txt     # PyYAML>=6.0
 pgrep -af llama-server
 kill <pid>                          # SIGTERM; it should release cleanly
 
-# wait ~10s, then confirm it released VRAM + settled:
+# wait ~10s, then confirm it released memory + settled:
 awk '{printf "vram: %.2f GiB\n", $1/1024^3}' /sys/class/drm/card0/device/mem_info_vram_used
+awk '{printf "gtt:  %.2f GiB\n", $1/1024^3}' /sys/class/drm/card0/device/mem_info_gtt_used
 awk '{printf "busy: %s%%\n", $1}' /sys/class/drm/card0/device/gpu_busy_percent
 ```
 
-The driver's idle gate requires **busy < 5% and VRAM < 4 GiB**. It is checked **at sweep
-start and again before every cell** (a 10-cell sweep spans hours; a background process that
-starts mid-sweep must not silently contaminate later cells). The check **polls for up to 90 s
-until the GPU settles** rather than sampling once: tearing down a large model leaves
+The driver's idle gate requires **busy < 5% and resident GPU memory < 4 GiB**, where
+resident memory is **VRAM + GTT**: with the UMA carve-out at 1 GiB (see
+[env.md](env.md)) a loaded `llama-server` holds its weights in GTT and leaves the
+VRAM counter at its idle floor, so a VRAM-only gate would wave a loaded GPU through.
+It is checked **at sweep start and again before every cell** (a 10-cell sweep spans
+hours; a background process that starts mid-sweep must not silently contaminate later
+cells). The check **polls for up to 90 s until the GPU settles** rather than sampling once:
+tearing down a large model leaves
 `gpu_busy` near 95% for several seconds after VRAM has already been released (the teardown is
 itself GPU work and the counter lags it) — sampling once hard-failed the cell following a
 59 GiB cell in `run-20261002-1731`. If the GPU still is not idle the driver
@@ -187,6 +192,16 @@ so a stale figure cannot ship with fresh numbers.
   `temp1_input`, millidegrees→°C), not full SoC draw. Under CPU-heavy prompt processing the
   true draw is higher; `amd-power-tune` (platform level) is not installed. `tok_per_w`
   therefore **understates** the energy cost of prompt processing.
+- **GPU memory is measured as two pools, and the published figure is their sum.** The
+  sampler records `mem_info_vram_used` **and** `mem_info_gtt_used` into `resources.csv`
+  (`vram_used_gib`, `gtt_used_gib`), and the rollup carries
+  `mem_peak_gib = peak(VRAM + GTT)`. This matters on an APU: with a large UMA carve-out the
+  weights sit in the VRAM pool; with a small one (this box: `mem_info_vram_total` = 1 GiB as
+  of 2026-10-22) the same weights sit in GTT and `mem_info_vram_used` stays at its idle floor
+  — a VRAM-only column read a 59 GiB cell as "0.87 GiB peak". Runs taken before the fix have
+  no `gtt_used_gib` column and therefore **no** `mem_peak_gib`: their `vram_peak_gib` is the
+  residency figure only because those runs predate the carve-out change. `vram_peak_gib` is
+  still emitted (it is what the counter said) but it is **not** residency on the current box.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
 - **TTFT is per-request state, not just latency: on Vulkan it includes KV-cache bookkeeping.**

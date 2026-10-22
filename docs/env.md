@@ -7,6 +7,14 @@ Verified 2026-09-30 on the reference machine (the hardware under test).
 > was measured on the versions below; re-checked cells on the newer stack are 8–11% lower on
 > `pp2048` with `tg512` unchanged (see [RUNNING.md §7](RUNNING.md)). Do not compare a new
 > run against these tables without re-measuring the rest.
+>
+> **The GPU memory split has changed too.** `mem_info_vram_total` now reads **1 GiB** (the
+> table below records the 96 GiB UMA carve-out the numbers were measured with), so model
+> weights are now resident in **GTT**, not in the VRAM pool: `mem_info_vram_used` sits at
+> ~0.1–1 GiB during a 59 GiB model's run while `MemAvailable` drops by the model's size.
+> The sampler records both pools and the rollup publishes `mem_peak_gib` (VRAM + GTT);
+> `vram_peak_gib` alone is not residency on this configuration. Restoring the carve-out
+> restores comparability with the table below.
 
 | Item | Value |
 |---|---|

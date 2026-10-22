@@ -1,5 +1,6 @@
-# Dependencies for the harness. The sweep and FIN-bench drivers are stdlib +
-# PyYAML; matplotlib is only needed to draw/regenerate the README charts and to
-# run the chart-freshness tests.
+# Dependencies for the harness. matplotlib is only needed to draw/regenerate the
+# README charts and to run the chart-freshness tests; Jinja2 renders the vendored
+# FIN-bench-v2 prompt templates (scripts/finbench.py).
 PyYAML>=6.0
+Jinja2>=3.1
 matplotlib>=3.8

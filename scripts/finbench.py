@@ -21,11 +21,17 @@ the pinned llama.cpp build (which refuses `echo`, so no OpenAI-compatible server
 can score continuations) and both documented in docs/RUNNING.md:
   1. scoring is done by `tools/score_ll` (libllama, logits) rather than by
      lm-evaluation-harness;
-  2. only the `cf` formulation at prompt variant `p0` is run, not the full
-     mcf/cf/gen × p0..p4 grid.
+  2. the grid is run one (formulation, variant) pair per invocation — `--formulation
+     cf|mcf --variant p0..p4` — rather than by lm-eval's task lookup. The prompts
+     are the upstream `doc_to_text` strings, vendored from the `finbench_v2` branch
+     into docs/finbench/upstream-<sha>.json and rendered with Jinja2, so a prompt is
+     never paraphrased. Choice sets and gold indices follow the upstream base yaml
+     (`doc_to_choice` / `doc_to_target`) for that formulation: note that `mcf` is
+     not just a different prompt — for belebele_fin the choices become the letters
+     A-D, while arc_c keeps the full option text (upstream does both).
 
 Data comes from the HF datasets-server REST API (JSON, paginated) and is cached
-locally, so no parquet/pyarrow dependency is needed. stdlib + PyYAML only.
+locally, so no parquet/pyarrow dependency is needed. stdlib + PyYAML + Jinja2.
 
 Usage:
   scripts/finbench.py --list
@@ -36,6 +42,8 @@ Usage:
 import argparse
 import collections
 import csv
+import functools
+import glob
 import json
 import os
 import re
@@ -46,11 +54,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import jinja2
+import yaml
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCORER = f"{REPO}/tools/score_ll"
 MODELS_DIR = os.path.expanduser("~/.local/share/models")
 DATA_DIR = os.path.expanduser("~/.cache/finbench")
 RESULTS = f"{REPO}/results"
+
+FORMULATIONS = ("cf", "mcf")
+VARIANTS = ("p0", "p1", "p2", "p3", "p4")
 
 MODELS = {
     # cell id -> gguf, mirroring matrix.yaml (the Finnish question's four cells)
@@ -79,77 +93,111 @@ def _gold_index(gold, choices):
     return int(gold)
 
 
-def _arc_c(doc):
-    choices = doc["choices"]["text"]
-    gold = doc["choices"]["label"].index(doc["answerKey"])
-    return f"Vastaus kysymykseen {doc['question']}, on:", choices, _gold_index(gold, choices)
+def _upstream_snapshot():
+    """The vendored upstream task templates (see scripts/fetch_finbench_upstream.py)."""
+    paths = sorted(glob.glob(os.path.join(REPO, "docs", "finbench", "upstream-*.json")))
+    if len(paths) != 1:
+        raise SystemExit("expected exactly one docs/finbench/upstream-*.json snapshot; "
+                         "run scripts/fetch_finbench_upstream.py")
+    with open(paths[0], encoding="utf-8") as f:
+        return json.load(f)
 
 
-def _belebele_fin(doc):
-    choices = [doc["mc_answer1"], doc["mc_answer2"], doc["mc_answer3"], doc["mc_answer4"]]
-    prompt = (f"Tässä on teksti: {doc['flores_passage']}\n"
-              f"Kysymys: {doc['question']} perustuen tekstiin.\nOikea vastaus:")
-    gold = ["1", "2", "3", "4"].index(doc["correct_answer_num"])
-    return prompt, choices, _gold_index(gold, choices)
+UPSTREAM = _upstream_snapshot()
+UPSTREAM_COMMIT = UPSTREAM["commit"]
+# StrictUndefined: a template field the namespace does not provide must fail loudly
+# rather than silently render an empty string into a prompt.
+_ENV = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)
 
 
-def _goldenswag(doc):
-    # process_docs replica: query = preprocess(label + ": " + ctx_a + " " + ctx_b.capitalize())
+@functools.lru_cache(maxsize=None)
+def _template(family, formulation, variant):
+    """(upstream path, upstream task name, compiled template) for one grid cell."""
+    prefix = f"{family}/{formulation}/"
+    rel = next((r for r in sorted(UPSTREAM["files"])
+                if r.startswith(prefix) and r.endswith(f"_{variant}.yaml")
+                and not os.path.basename(r).startswith("_")), None)
+    if rel is None:
+        raise SystemExit(f"no upstream template for {family}/{formulation}/{variant}")
+    spec = yaml.safe_load(UPSTREAM["files"][rel]["text"])
+    # lm_eval prepends `description` to doc_to_text even at zero few-shot.
+    text = (spec.get("description") or "") + spec["doc_to_text"]
+    return rel, spec.get("task", ""), _ENV.from_string(text)
+
+
+def _goldenswag_fields(doc):
     ctx = doc["ctx_a"] + " " + doc["ctx_b"].capitalize()
     query = _preprocess_endings(doc["activity_label"] + ": " + ctx)
-    choices = [_preprocess_endings(e) for e in doc["endings"]]
-    prompt = f"Kerro loogisin jatko seuraavalle tekstille:\n\n{query}\n\nJatko:"
-    return prompt, choices, _gold_index(int(doc["label"]), choices)
+    endings = [_preprocess_endings(e) for e in doc["endings"]]
+    return query, endings
 
 
-def _scandisent(doc):
-    # process_docs replica: label_map maps to Finnish sentiment words
+def _goldenswag_gold(doc):
+    """Label is an int index upstream; tolerate a numeric string, never crash."""
+    try:
+        return int(doc["label"])
+    except (TypeError, ValueError):
+        return -100
+
+
+def _scandisent_fields(doc):
     label_map = {"positive": "positiivinen", "negative": "negatiivinen"}
-    choices = [label_map["positive"], label_map["negative"]]
-    prompt = f"Arvostelijan teksti: {doc['text']}\nTunne:"
-    return prompt, choices, _gold_index(label_map[doc["label"]], choices)
+    return doc["text"], [label_map["positive"], label_map["negative"]], label_map[doc["label"]]
 
 
-def _sib200(doc):
-    prompt = f"Päättele, mitä aihetta seuraava uutinen käsittelee. Uutinen: {doc['text']}\nAihe:"
-    choices = list(doc["choices"])
-    return prompt, choices, _gold_index(int(doc["answer_idx"]), choices)
-
-
-TASKS = collections.OrderedDict([
+# Per-family data plumbing. `namespace` is what the upstream Jinja template sees
+# (the process_docs-transformed doc where upstream has one), `choices` follows the
+# formulation's doc_to_choice, `gold` is the doc_to_target index.
+FAMILIES = collections.OrderedDict([
     ("arc_c", {
         "repo": "TurkuNLP/finbenchv2-arc-c-fi-ht", "config": "default", "split": "test",
-        "upstream": "arc_c/cf/arc_challenge_fi_cf_fbv2_p0.yaml (_arc_challenge_fi_cf_fbv2_yaml)",
-        "doc_to_text": "Vastaus kysymykseen {{ question }}, on:",
-        "transform": _arc_c,
+        "namespace": lambda doc, formulation: doc,
+        "choices": lambda doc, formulation: doc["choices"]["text"],
+        "gold": lambda doc, choices: _gold_index(
+            doc["choices"]["label"].index(doc["answerKey"]), choices),
     }),
     ("belebele_fin", {
         "repo": "TurkuNLP/finbenchv2-belebele-fi-og", "config": "default", "split": "test",
-        "upstream": "belebele_fin/cf/belebele_fin_cf_fbv2_p0.yaml (_belebele_fin_cf_yaml)",
-        "doc_to_text": "Tässä on teksti: {{flores_passage}}\nKysymys: {{question}} perustuen tekstiin.\nOikea vastaus:",
-        "transform": _belebele_fin,
+        "namespace": lambda doc, formulation: doc,
+        "choices": lambda doc, formulation: (
+            [doc["mc_answer1"], doc["mc_answer2"], doc["mc_answer3"], doc["mc_answer4"]]
+            if formulation == "cf" else ["A", "B", "C", "D"]),
+        "gold": lambda doc, choices: _gold_index(
+            ["1", "2", "3", "4"].index(doc["correct_answer_num"]), choices),
     }),
     ("goldenswag", {
         "repo": "TurkuNLP/finbenchv2-goldenswag-fi-ht", "config": "default", "split": "train",
-        "upstream": "goldenswag/cf/goldenswag_fi_cf_fbv2_p0.yaml (_goldenswag_fi_cf_yaml + ogx_goldenswagx_utils.py)",
-        "doc_to_text": "Kerro loogisin jatko seuraavalle tekstille:\n\n{{ query }}\n\nJatko:",
-        "transform": _goldenswag,
+        "namespace": lambda doc, formulation: dict(
+            zip(("query", "choices"), _goldenswag_fields(doc))),
+        "choices": lambda doc, formulation: _goldenswag_fields(doc)[1],
+        "gold": lambda doc, choices: _gold_index(_goldenswag_gold(doc), choices),
     }),
     ("scandisent", {
         "repo": "TurkuNLP/finbenchv2-scandisent-fi-mini", "config": "default", "split": "test",
-        "upstream": "scandisent/cf/scandisent_fi_cf_fbv2_p0.yaml (_scandisent_fi_cf_yaml + scandisent_fi_utils.py)",
-        "doc_to_text": "Arvostelijan teksti: {{ query }}\nTunne:",
-        "transform": _scandisent,
+        "namespace": lambda doc, formulation: {
+            "query": _scandisent_fields(doc)[0], "choices": _scandisent_fields(doc)[1]},
+        "choices": lambda doc, formulation: _scandisent_fields(doc)[1],
+        "gold": lambda doc, choices: _gold_index(_scandisent_fields(doc)[2], choices),
     }),
     ("sib200", {
         "repo": "TurkuNLP/finbenchv2-sib-200-fi-og", "config": "default", "split": "test",
-        "upstream": "sib200/cf/sib200_fi_cf_fbv2_p0.yaml (_sib200_fi_cf_yaml)",
-        "doc_to_text": "Päättele, mitä aihetta seuraava uutinen käsittelee. Uutinen: {{ text }}\nAihe:",
-        "transform": _sib200,
+        "namespace": lambda doc, formulation: {
+            "text": doc["text"], "choices": list(doc["choices"])},
+        "choices": lambda doc, formulation: list(doc["choices"]),
+        "gold": lambda doc, choices: _gold_index(int(doc["answer_idx"]), choices),
     }),
 ])
-# squad_fi and truthfulqa have no cf variant upstream (gen / mc1 / mc2 only), so
-# they are out of scope for a cf-only run by construction, not by omission.
+# squad_fi and truthfulqa have no cf/mcf variant upstream (gen / mc1 / mc2 only), so
+# they are out of scope for this axis by construction, not by omission.
+
+
+def item_for(family, doc, formulation="cf", variant="p0"):
+    """doc -> (prompt, choices, gold), rendered from the upstream template."""
+    spec = FAMILIES[family]
+    _, _, template = _template(family, formulation, variant)
+    prompt = template.render(**spec["namespace"](doc, formulation))
+    choices = spec["choices"](doc, formulation)
+    return prompt, choices, spec["gold"](doc, choices)
 
 
 # --------------------------------------------------------------------------
@@ -173,7 +221,7 @@ def fetch_rows(task, data_dir, limit=None, quiet=False):
             print(f"  {task}: {len(rows)} rows (cached)")
         return rows[:limit] if limit else rows
 
-    spec = TASKS[task]
+    spec = FAMILIES[task]
     rows = [json.loads(l) for l in open(part, encoding="utf-8")] if os.path.isfile(part) else []
     offset, total = len(rows), None
     if rows and not quiet:
@@ -228,14 +276,14 @@ def fetch_rows(task, data_dir, limit=None, quiet=False):
     return rows
 
 
-def build_items(task, rows, limit=None):
+def build_items(task, rows, limit=None, formulation="cf", variant="p0"):
     """doc -> (item id, prompt, choices, gold index); mirrors lm-eval's doc pipeline."""
     items, skipped = [], 0
     for i, doc in enumerate(rows):
         if limit and len(items) >= limit:
             break
         try:
-            prompt, choices, gold = TASKS[task]["transform"](doc)
+            prompt, choices, gold = item_for(task, doc, formulation, variant)
         except (KeyError, ValueError, AttributeError) as e:
             skipped += 1
             print(f"    {task}: skipped row {i}: {type(e).__name__}: {e}", file=sys.stderr)
@@ -316,7 +364,8 @@ def evaluate(task, items, lls, ntoks=None):
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
-def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, threads, fa):
+def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, threads, fa,
+              formulation="cf", variant="p0"):
     print(f"=== {cell} ({os.path.basename(model_path)}) ===")
     if not os.path.isfile(model_path):
         print(f"  SKIP: {model_path} not on disk")
@@ -324,7 +373,8 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
     items, summaries, skipped = [], {}, {}
     for task in tasks:
         rows = fetch_rows(task, data_dir, limit=pilot)
-        t_items, t_skipped = build_items(task, rows, limit=pilot)
+        t_items, t_skipped = build_items(task, rows, limit=pilot,
+                                         formulation=formulation, variant=variant)
         skipped[task] = t_skipped
         items.extend(t_items)
         print(f"  {task}: {len(t_items)} items"
@@ -343,67 +393,97 @@ def run_model(cell, model_path, run_id, tasks, pilot, data_dir, ngl, n_ctx, thre
     outdir = f"{RESULTS}/finbench-{run_id}/{cell}"
     with open(f"{outdir}/summary.json", "w", encoding="utf-8") as f:
         json.dump({"cell": cell, "model": os.path.basename(model_path), "run_id": run_id,
-                   "formulation": "cf", "prompt_variant": "p0",
+                   "formulation": formulation, "prompt_variant": variant,
+                   "upstream_commit": UPSTREAM_COMMIT,
                    "pilot_limit": pilot, "tasks": summaries}, f, indent=1, ensure_ascii=False)
     return summaries
 
 
-def consolidate(run_id):
-    """Roll every model of this run into a CSV + markdown table (one row per model/task)."""
-    rows, models, pilot = [], [], 0
-    raw = {}                        # cell -> {task: unrounded acc}, for the mean column
-    base = f"{RESULTS}/finbench-{run_id}"
-    if not os.path.isdir(base):
-        return
-    for cell in sorted(os.listdir(base)):
-        sp = os.path.join(base, cell, "summary.json")
-        if not os.path.isfile(sp):
+def _collect_full_runs(results_dir):
+    """Rows from every full run on disk: (run_id, formulation, variant, cell, task, ...).
+
+    Pilots are skipped outright — they score the first N items per task and must
+    never be published next to full-split numbers.
+    """
+    rows = []
+    for base in sorted(glob.glob(os.path.join(results_dir, "finbench-*"))):
+        if not os.path.isdir(base):
             continue
-        s = json.load(open(sp, encoding="utf-8"))
-        models.append(cell)
-        pilot = max(pilot, s.get("pilot_limit") or 0)
-        raw[cell] = {task: d["acc"] for task, d in s["tasks"].items()}
-        for task, d in s["tasks"].items():
-            rows.append({"run_id": run_id, "cell": cell, "task": task,
-                         "n": d["n"], "acc": round(d["acc"], 4),
-                         "acc_norm": round(d["acc_norm"], 4)})
+        for cell in sorted(os.listdir(base)):
+            sp = os.path.join(base, cell, "summary.json")
+            if not os.path.isfile(sp):
+                continue
+            with open(sp, encoding="utf-8") as f:
+                s = json.load(f)
+            if (s.get("pilot_limit") or 0) > 0:
+                continue
+            run_id = s.get("run_id") or os.path.basename(base)[len("finbench-"):]
+            formulation = s.get("formulation", "cf")      # older runs predate the stamp
+            variant = s.get("prompt_variant", "p0")
+            for task, d in s["tasks"].items():
+                rows.append({"run_id": run_id, "formulation": formulation,
+                             "variant": variant, "cell": cell, "task": task,
+                             "n": d["n"], "acc": round(d["acc"], 4),
+                             "acc_norm": round(d["acc_norm"], 4), "_raw": d["acc"]})
+    return rows
+
+
+def consolidate(_run_id=None):
+    """Rebuild the tracked FIN-bench rollups from every full run on disk.
+
+    One table per (formulation, variant) pair and one CSV keyed by
+    run_id/formulation/variant/cell/task, so publishing a second pair adds rows
+    instead of replacing the first. `_run_id` is accepted for CLI compatibility
+    and ignored.
+    """
+    rows = _collect_full_runs(RESULTS)
     if not rows:
+        print("no full FIN-bench runs on disk — tracked rollups left untouched")
         return
     path = f"{RESULTS}/finbench-consolidated.csv"
-    fields = ["run_id", "cell", "task", "n", "acc", "acc_norm"]
+    md_path = f"{RESULTS}/finbench-table.md"
+    fields = ["run_id", "formulation", "variant", "cell", "task", "n", "acc", "acc_norm"]
     with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
-        w.writerows(rows)
+        w.writerows(sorted(rows, key=lambda r: (r["formulation"], r["variant"],
+                                                r["run_id"], r["cell"], r["task"])))
     tasks = sorted({r["task"] for r in rows})
     ns = sorted({r["n"] for r in rows})
-    md = [f"# FIN-bench-v2 — Finnish capability (run `{run_id}`)", ""]
-    if pilot:
-        md += [f"> **PILOT — first {pilot} items per task only.** Not comparable with a full "
-               f"run; a task's score can move several points on the full split.", ""]
-    md += [f"`cf` formulation, prompt variant `p0`, scored by `tools/score_ll` (pinned "
-           f"llama.cpp logits). Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of "
-           f"the choice text, `acc_norm` divides by the choice's character length, exactly as "
-           f"`lm_eval/api/task.py` does. Items per task: "
-           + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns)) + ".", "",
-           "| model | " + " | ".join(tasks) + " | mean acc |",
-           "|---" * (len(tasks) + 2) + "|"]
-    # ranked by mean acc — a capability table is read as a ranking, and the
-    # alphabetical order (as cell ids happen to be named) hides exactly that.
-    ranked = []
-    for cell in models:
-        vals = {r["task"]: r for r in rows if r["cell"] == cell}
-        # M-5: average the unrounded accuracies. The CSV stores 4-decimal values,
-        # so averaging those rounds a second time for no reason.
-        accs = [raw[cell][t] for t in tasks if t in raw[cell]]
-        ranked.append((sum(accs) / len(accs), cell, vals))
-    for mean, cell, vals in sorted(ranked, reverse=True):
-        md.append(f"| {cell} | " + " | ".join(
-            f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
-            for t in tasks)
-            + f" | {mean:.3f} |")
-    open(f"{RESULTS}/finbench-table.md", "w", encoding="utf-8").write("\n".join(md) + "\n")
-    print(f"\nwrote {path} and {RESULTS}/finbench-table.md")
+    grouped = collections.defaultdict(list)
+    for r in rows:
+        grouped[(r["formulation"], r["variant"])].append(r)
+    md = ["# FIN-bench-v2 — Finnish capability", "",
+          "Scored by `tools/score_ll` (pinned llama.cpp logits) from the upstream "
+          "templates vendored in `docs/finbench/`. Cells are **acc / acc_norm**; `acc` = "
+          "argmax loglikelihood of the choice text, `acc_norm` divides by the choice's "
+          "character length, exactly as `lm_eval/api/task.py` does. Items per task: "
+          + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns))
+          + ". Pilots are excluded.", ""]
+    for (formulation, variant), combo_rows in sorted(grouped.items()):
+        run_ids = sorted({r["run_id"] for r in combo_rows})
+        md += [f"## `{formulation}` / `{variant}`", "",
+               f"Run `{', '.join(run_ids)}`.", "",
+               "| model | " + " | ".join(tasks) + " | mean acc |",
+               "|---" * (len(tasks) + 2) + "|"]
+        by_cell = collections.defaultdict(dict)
+        for r in combo_rows:
+            by_cell[r["cell"]][r["task"]] = r
+        ranked = []
+        for cell, vals in by_cell.items():
+            # average the unrounded accuracies (the CSV stores 4-decimal values)
+            accs = [vals[t]["_raw"] for t in tasks if t in vals]
+            ranked.append((sum(accs) / len(accs), cell, vals))
+        for mean, cell, vals in sorted(ranked, reverse=True):
+            md.append(f"| {cell} | " + " | ".join(
+                f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
+                for t in tasks) + f" | {mean:.3f} |")
+        md.append("")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(md).rstrip() + "\n")
+    print(f"wrote {path} and {md_path} "
+          f"({len(grouped)} formulation/variant pairs, "
+          f"{len({r['run_id'] for r in rows})} runs)")
 
 
 def main():
@@ -413,6 +493,10 @@ def main():
     ap.add_argument("--all", action="store_true", help="run every model in MODELS")
     ap.add_argument("--tasks", default="", help="comma-separated task subset (default: all)")
     ap.add_argument("--pilot", type=int, default=0, help="cap items per task (fast check)")
+    ap.add_argument("--formulation", choices=FORMULATIONS, default="cf",
+                    help="FIN-bench formulation (default cf)")
+    ap.add_argument("--variant", choices=VARIANTS, default="p0",
+                    help="prompt variant (default p0)")
     ap.add_argument("--run-id", default=time.strftime("%Y%m%d-%H%M"))
     ap.add_argument("--data-dir", default=DATA_DIR)
     ap.add_argument("--ngl", type=int, default=99)
@@ -425,10 +509,16 @@ def main():
     args = ap.parse_args()
 
     if args.list:
-        print("tasks (cf / p0):")
-        for t, spec in TASKS.items():
-            print(f"  {t:<14} {spec['repo']} [{spec['split']}]")
-            print(f"                 upstream: {spec['upstream']}")
+        print(f"FIN-bench-v2 grid from {UPSTREAM['source']} @ {UPSTREAM_COMMIT[:12]} "
+              f"({os.path.basename(sorted(glob.glob(os.path.join(REPO, 'docs', 'finbench', 'upstream-*.json')))[0])})")
+        for family, spec in FAMILIES.items():
+            print(f"  {family:<14} {spec['repo']} [{spec['split']}]")
+            for formulation in FORMULATIONS:
+                cells = []
+                for variant in VARIANTS:
+                    rel, task, _ = _template(family, formulation, variant)
+                    cells.append(task or variant)
+                print(f"    {formulation:<4} " + ", ".join(cells))
         print("models:")
         for c, p in MODELS.items():
             print(f"  {c:<18} {'on disk' if os.path.isfile(p) else 'MISSING'}  {p}")
@@ -437,9 +527,9 @@ def main():
         consolidate(args.run_id)
         return
 
-    tasks = list(TASKS) if not args.tasks else [t.strip() for t in args.tasks.split(",")]
+    tasks = list(FAMILIES) if not args.tasks else [t.strip() for t in args.tasks.split(",")]
     for t in tasks:
-        if t not in TASKS:
+        if t not in FAMILIES:
             raise SystemExit(f"unknown task {t!r}; --list shows the options")
     targets = (list(MODELS.items()) if args.all
                else [(args.model, MODELS.get(args.model, args.model))] if args.model
@@ -447,11 +537,13 @@ def main():
     if not targets:
         raise SystemExit("pass --model <cell|path>, --all, --list or --consolidate-only")
 
-    print(f"FIN-bench-v2 cf/p0 | run {args.run_id} | tasks: {', '.join(tasks)}"
+    print(f"FIN-bench-v2 {args.formulation}/{args.variant} | run {args.run_id} | "
+          f"tasks: {', '.join(tasks)}"
           + (f" | PILOT {args.pilot} items/task" if args.pilot else ""))
     for cell, path in targets:
         run_model(cell, path, args.run_id, tasks, args.pilot, args.data_dir,
-                  args.ngl, args.ctx, args.threads, args.fa)
+                  args.ngl, args.ctx, args.threads, args.fa,
+                  formulation=args.formulation, variant=args.variant)
     consolidate(args.run_id)
 
 

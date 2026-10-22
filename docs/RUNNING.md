@@ -189,15 +189,35 @@ so a stale figure cannot ship with fresh numbers.
   therefore **understates** the energy cost of prompt processing.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
-- **TTFT has a wide per-request spread on Vulkan — read the median, not just the mean.** With
-  an identical prompt repeated three times, Vulkan's first timed request lands near the
-  prefill prediction and requests 2-3 take 2–12x longer to first token, while ROCm runs flat
-  (measured 2026-10-02; e.g. `qwen3.8-27b-q5_k_xl`, prefill prediction ≈ 134 ms — Vulkan
-  `[787, 1632, 1634]` ms, ROCm `[137, 196, 135]` ms). Generation rate is unaffected
-  (`gen_tps` is identical across the three requests). `consolidated.csv` carries both
-  `ttft_ms` (mean) and `ttft_ms_p50` (median) for this reason; the per-request values are in
-  `ttft.json`. Root cause not yet investigated — that is a Vulkan-side question, not a
-  harness one.
+- **TTFT is per-request state, not just latency: on Vulkan it includes KV-cache bookkeeping.**
+  Measured 2026-10-22 on the Qwen3.8-27B q5 cell (Vulkan, three 512-token requests, q8 KV): the
+  server logs a **1-token** prompt eval of ~785 ms and TTFT is 787 ms on the first request, then
+  1707 / 1706 ms — an extra ~905 ms that the server attributes to neither prefill nor decode.
+  Two single-variable runs isolate the trigger (values are TTFT / logged prompt-eval / difference):
+
+  | condition | TTFT (3 requests) | prompt eval | TTFT − prompt eval |
+  |---|---|---|---|
+  | 512-token generations, q8 KV | 787 / 1707 / 1706 ms | 785 / 802 / 802 ms | 2 / 905 / 903 ms |
+  | 32-token generations, q8 KV | 813 / 804 / 785 ms | 811 / 802 / 783 ms | 2 / 2 / 2 ms |
+  | 512-token generations, f16 KV | 141 / 417 / 417 ms | 139 / 134 / 133 ms | 2 / 284 / 284 ms |
+
+  So (a) the stall needs a **long preceding generation** — the prompt itself is not the trigger, it is
+  the KV trim/rollback that follows 512 generated tokens; and (b) **quantised KV is ~85% of the
+  cost** on this cell (base 790 → 135 ms, stall 905 → 284 ms), while generation rate is identical in
+  every arm (10.46–10.52 tok/s). The same q8→f16 swap on the 32B cell changes nothing (overhead
+  73 → 76 ms), so this is a **model-specific** cost, not a general Vulkan penalty. ROCm stays flat
+  (2–73 ms) on the same cells.
+
+  **Consequence:** `ttft_ms` (mean) and `ttft_ms_p50` (median) mix prompt prefill with per-request KV
+  work. Do not compare them across cells or backends, and any future TTFT measurement must state its
+  KV type. Per-request values are in `ttft.json`. This supersedes the 2026-10-02 note that described
+  "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
+- **Numbers are stack-stamped.** The tracked rows were measured on kernel 7.2.8 / Mesa 26.2.3
+  (`docs/env.md`). The machine now runs kernel 7.2.10 / Mesa 26.2.4, where re-checking one cell per
+  size gives **pp2048 8–11% lower** (27B 328.65 → 293.75, 32B 264.51 → 242.41 tok/s) while **tg512 is
+  unchanged** (10.60 → 10.56, 9.71 → 9.71). Do not mix new runs into the published tables without
+  re-measuring the rest first, and stamp the stack in any new `run.json`.
+
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets
   `HSA_OVERRIDE_GFX_VERSION=11.5.0`); if it still fails, treat ROCm as a bonus axis per PLAN.
@@ -255,8 +275,8 @@ CPU golden. It skips unless the binary and `Qwen3-4B-Q4_K_M.gguf` are present:
 /usr/bin/python3 -m unittest discover -s tests -p 'test_score_ll.py' -v
 ```
 
-Run (`scripts/finbench.py` stays stdlib + PyYAML; data comes from the HF datasets-server REST
-API and is cached resumably under `~/.cache/finbench/`):
+Run (`scripts/finbench.py` is stdlib + PyYAML + Jinja2; data comes from the HF datasets-server
+REST API and is cached resumably under `~/.cache/finbench/`):
 
 ```
 /usr/bin/python3 scripts/finbench.py --list
@@ -265,14 +285,33 @@ API and is cached resumably under `~/.cache/finbench/`):
 /usr/bin/python3 scripts/finbench.py --consolidate-only --run-id <id>
 ```
 
-**Scope:** the five families that have a `cf` variant — `arc_c`, `belebele_fin`, `goldenswag`,
-`scandisent`, `sib200` — at prompt variant `p0`, zero-shot: 7,296 items. `goldenswag` is
-scored on its `train` split (its test labels are withheld upstream), while the other four use
-`test`. `squad_fi` and
-`truthfulqa` exist upstream only as `gen`/`mc1`/`mc2`, so a cf-only run excludes them by
-construction rather than by omission. Per-task detail lands in
-`results/finbench-<run>/<cell>/<task>.json` (gitignored); the rollups
-`results/finbench-consolidated.csv` and `results/finbench-table.md` are tracked.
+**Scope and grid.** Upstream publishes the five `multiple_choice` families at two formulations
+(`cf`, `mcf`) × five prompt variants (`p0`–`p4`) = 50 task configs; the shipped table is
+`cf`/`p0` for all five. One invocation runs exactly **one** (formulation, variant) pair:
+
+```
+/usr/bin/python3 scripts/finbench.py --formulation mcf --variant p0 --model <cell> --run-id <id>
+```
+
+The prompts are not paraphrased: `scripts/fetch_finbench_upstream.py` vendors the upstream
+`doc_to_text` (and `description`) strings into `docs/finbench/upstream-<sha>.json`, and the
+driver renders them with Jinja2. `mcf` is not just a different prompt — the scored choice set
+changes for some families (belebele_fin scores the letters A–D, arc_c keeps the full option
+text); the choice set follows the upstream base yaml's `doc_to_choice`.
+`tests/test_finbench_upstream.py` pins the whole 5×2×5 grid, including two upstream quirks that
+are deliberately replicated (scandisent/mcf/p3 spells "positivinen"; belebele/mcf numbers the
+options 1–4 while scoring A–D).
+
+The five families: `arc_c`, `belebele_fin`, `goldenswag`, `scandisent`, `sib200` — 7,296 items
+per model at full split. `goldenswag` is scored on its `train` split (its test labels are
+withheld upstream), while the other four use `test`. `squad_fi` and `truthfulqa` exist upstream
+only as `gen`/`mc1`/`mc2`, so they are out of scope for this axis by construction rather than
+by omission. Per-task detail lands in `results/finbench-<run>/<cell>/<task>.json` (gitignored);
+`results/finbench-consolidated.csv` and `results/finbench-table.md` are tracked, and carry
+`formulation`/`variant` columns.
+
+**Pilots never touch the tracked rollup.** A `--pilot N` run writes `pilot-consolidated.csv`
+and `pilot-table.md` inside its own run directory; only a full run rewrites the tracked files.
 
 Metrics are the harness's own (`lm_eval/api/task.py`, `OUTPUT_TYPE == "multiple_choice"`):
 `acc` = argmax of the summed choice loglikelihood; `acc_norm` = argmax of the loglikelihood

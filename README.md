@@ -178,10 +178,12 @@ ROCm runs hotter throughout: 83–91 °C across the ten cells against 69–85 °
 Vulkan, with the Qwen3-4B cell the hottest measured at 91 °C. Temperature is
 logged per run.
 
-> **Before quoting a TTFT, read [docs/RUNNING.md](docs/RUNNING.md) §7.** On
-> Vulkan the first timed request is much faster than the next two, so the mean is
-> misleading; this table reports the median, and `results/table.md` prints both
-> the mean and the p50. That Vulkan spread is an open finding, not a harness bug.
+> **The TTFT column is not a like-for-like latency figure — read
+> [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it.** On Vulkan, a request that
+> follows a long generation pays KV-cache bookkeeping: ~0.9 s per request on the
+> Qwen3.8-27B cell with q8 KV, ~0.3 s with f16 KV, and that cost dominates its number.
+> Medians are reported and per-request values are in `results/table.md`; do not compare
+> TTFT across cells or backends in this table.
 
 ## Charts
 
@@ -218,9 +220,12 @@ for why it needs its own scorer).
 
 Five models × the five task families that have a `cf` variant × prompt variant
 `p0`, zero-shot — 7,296 items per model, all scored: no skips, no context
-overflows, no unusable gold indices. Cells are **acc / acc_norm**; `acc_norm`
-divides the choice loglikelihood by its character length, exactly as the
-harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
+overflows, no unusable gold indices. The driver also supports the rest of the
+upstream grid — two formulations (`cf`, `mcf`) × five prompt variants
+(`p0`–`p4`), one pair per run (`--formulation` / `--variant`) — but the table
+below is `cf`/`p0`, the only pair swept so far. Cells are **acc / acc_norm**;
+`acc_norm` divides the choice loglikelihood by its character length, exactly as
+the harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
 
 | Model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
 |---|---|---|---|---|---|---|
@@ -256,6 +261,38 @@ at one prompt variant, so it is not comparable with published FIN-bench tables
 specifically); `goldenswag` is scored on its `train` split because its test
 labels are withheld upstream; and GPU-vs-CPU logprob numerics differ by up to
 ~0.12, harmless for a task score but able to flip a near-tie.
+
+### Formulation sensitivity — one `mcf` / `p0` probe
+
+The driver can also run the `mcf` formulation, which lists the options inside the
+prompt. One full-split probe (`fi-mcf-p0-20261021`, Poro 2 8B Q4_K_M) shows it is
+**not a like-for-like scale** and is reported as a negative result:
+
+| Task | cf/p0 acc | mcf/p0 acc | Δ |
+|---|---|---|---|
+| arc_c | 0.389 | 0.466 | +0.077 |
+| belebele_fin | 0.452 | 0.239 | −0.213 |
+| goldenswag | 0.579 | 0.335 | −0.244 |
+| scandisent | 0.922 | 0.811 | −0.111 |
+| sib200 | 0.306 | 0.372 | +0.067 |
+| **mean acc** | **0.530** | **0.445** | **−0.085** |
+
+Why the mean is misleading: `belebele_fin` collapses to chance (0.239 against
+0.25 for four options) and predicted "A" on all 900 items. A 200-item control
+scored the same items with bare and space-prefixed continuations and still picked
+"A" every time, so under `mcf` that task measures letter bias, not
+comprehension. `goldenswag`'s `acc_norm` falls to 0.199 — below chance — because
+upstream's `mcf` prompt asks for a letter while `doc_to_choice` remains the full
+endings. `arc_c` and `sib200` improve (the options in context help), `scandisent`
+degrades. So the `cf`/`p0` table above stays the published Finnish comparison;
+the `mcf` numbers are kept in [results/finbench-table.md](results/finbench-table.md)
+as a documented limitation rather than a capability score.
+
+One measurement caveat that applies to every column: choices are scored as bare
+continuations. Re-scoring 200 `scandisent` items with a space-prefixed choice
+(the way `lm_eval` shifts trailing whitespace) changed 7 predictions
+(0.940 → 0.965), so the boundary tokenisation is worth ~1–2 points on a binary
+task and does not explain the `mcf` collapse.
 
 ## Quick start
 
@@ -310,7 +347,9 @@ What is pinned, and where:
 |---|---|
 | `scripts/run_sweep.py` | the sweep driver (stdlib + PyYAML) |
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib helpers: power/VRAM trace, TTFT probe |
-| `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML) |
+| `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML + Jinja2) |
+| `scripts/fetch_finbench_upstream.py` | refreshes the vendored upstream prompt templates |
+| `docs/finbench/` | upstream template snapshot (commit-pinned, sha256 per file) |
 | `scripts/make_charts.py` | regenerates the charts from the rollup (needs matplotlib) |
 | `scripts/make_social_preview.py` | regenerates the 1280×640 repository social card |
 | `tools/score_ll.cpp` | loglikelihood scorer for the FIN-bench axis, linked against the pinned llama.cpp |
@@ -334,9 +373,16 @@ What is pinned, and where:
 - **Two contexts.** `llama-bench` runs at the model-default context (4096) and
   `llama-server` at 8192. Do not compare a bench number to a server number as if
   they were measured at the same context.
-- **Vulkan TTFT spread.** The first timed request is much faster than the next
-  two on Vulkan, so the mean is misleading; medians are reported and the
-  per-request values are in `results/table.md`. An open finding, not a bug.
+- **TTFT mixes prefill with per-request KV work on Vulkan.** A request that follows a
+  long generation pays KV-cache bookkeeping: on the Qwen3.8-27B cell, ~0.79 s per
+  request plus ~0.9 s after every 512-token generation with q8 KV; with f16 KV those
+  fall to ~0.14 s and ~0.28 s. The 32B cell shows no q8-vs-f16 difference, so the
+  column is not comparable across cells or backends, and for the 27B cell it is
+  dominated by cache work rather than latency.
+- **Numbers are stack-stamped.** The tracked tables were measured on kernel 7.2.8 /
+  Mesa 26.2.3; this machine now runs 7.2.10 / 26.2.4, where re-checked cells are
+  8–11% lower on `pp2048` while `tg512` is unchanged. Re-measure before mixing new
+  runs into the published tables.
 - **No error bars.** Three repeats catch a broken run; they do not support a 1%
   claim. Differences under ~2% are within noise for this setup.
 - **FIN-bench is one formulation.** `cf` at prompt variant `p0` only. `mcf` and
@@ -380,13 +426,17 @@ metadata is in [CITATION.cff](CITATION.cff):
 
 ## Roadmap
 
-- **Finnish capability, wider** — the `mcf` formulation and prompt variants
-  `p1`–`p4`.
+- **Finnish capability, wider** — the driver now runs the full upstream grid
+  (`--formulation mcf`, `--variant p1`–`p4`, one pair per run, prompts rendered
+  from the vendored upstream templates). What remains is the GPU time to sweep
+  it and publish the formulation / prompt-variant comparison.
 - **An English/general quality axis** — strict-JSON extraction, function
   calling, and a GSM8K-style math subset over the same cells.
 - **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.
-- **Vulkan TTFT root cause** — one experiment to separate prompt-cache reuse
-  from a per-request Vulkan cost.
+- **TTFT measurement protocol** — the root cause of the Vulkan inflation is narrowed
+  (KV trim after long generations; quantisation-dependent on the 27B). Remaining:
+  choose f16 KV or a cold-request protocol, re-probe the ten cells, and republish the
+  column with its KV type stated.
 - **Wider matrix.** One-time downloads, not yet swept: gpt-oss-20b (MXFP4),
   Qwen3-30B-A3B (Q4_K_M), Llama 3.1 8B (Q8_0), Mistral Small 3.2 24B (Q4_K_M),
   Gemma 3 27B (Q4_K_M), Llama 3.3 70B (Q4_K_M).

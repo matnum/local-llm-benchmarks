@@ -1,0 +1,224 @@
+{
+ "branch": "finbench_v2",
+ "commit": "af382197b365c90c9a016fefb9cf32b976fd178d",
+ "fetched": "2026-10-21",
+ "files": {
+  "arc_c/cf/arc_challenge_fi_cf_fbv2_p0.yaml": {
+   "sha256": "50907e2edf1016e89c7d2924c934a6211fc82d710914396829b4bf9264accf1a",
+   "text": "task: arc_challenge_fi_cf_fbv2_p0\ndoc_to_text: \"Vastaus kysymykseen {{ question }}, on:\"\ninclude: _arc_challenge_fi_cf_fbv2_yaml"
+  },
+  "arc_c/cf/arc_challenge_fi_cf_fbv2_p1.yaml": {
+   "sha256": "fce3c711d507092e005776403ed473f32b4528d84bfc3f20222a46ec9e2393d6",
+   "text": "task: arc_challenge_fi_cf_fbv2_p1\ndoc_to_text: \"Mik\u00e4 on oikea vastaus seuraavaan kysymykseen?\\n\\n{{ question }}\\nVastaus:\"\ninclude: _arc_challenge_fi_cf_fbv2_yaml"
+  },
+  "arc_c/cf/arc_challenge_fi_cf_fbv2_p2.yaml": {
+   "sha256": "078e13de0409647d0580a094f3c465095fe67508df293511e0db36f654337493",
+   "text": "task: arc_challenge_fi_cf_fbv2_p2\ndoc_to_text: \"{{ question }}\\nVastaus:\"\ninclude: _arc_challenge_fi_cf_fbv2_yaml"
+  },
+  "arc_c/cf/arc_challenge_fi_cf_fbv2_p3.yaml": {
+   "sha256": "e69f4c77327b38037ffbd2143d38cb3cd821627e3b20bc16fd1cda7c8e07cdb4",
+   "text": "task: arc_challenge_fi_cf_fbv2_p3\ndoc_to_text: \"Vastaa seuraavaan kysymykseen. Kysymys: {{ question }}\"\ninclude: _arc_challenge_fi_cf_fbv2_yaml"
+  },
+  "arc_c/cf/arc_challenge_fi_cf_fbv2_p4.yaml": {
+   "sha256": "1a82334a4317159812ea4088037cdf4be39f648db7aeded56b1d42830679aed7",
+   "text": "task: arc_challenge_fi_cf_fbv2_p4\ndoc_to_text: \"Kysymys kuuluu: {{ question }}. Mik\u00e4 on oikea vastaus?\"\ninclude: _arc_challenge_fi_cf_fbv2_yaml"
+  },
+  "arc_c/mcf/arc_challenge_fi_mcf_fbv2_p0.yaml": {
+   "sha256": "fc16fc8dcbf3777b0cb19b05b3f447abd8d6dd0ce76a3142b25a40916498a3e2",
+   "text": "task: arc_challenge_fi_mcf_fbv2_p0\ndoc_to_text: \"Mik\u00e4 on paras vastaus kysymykseen {{ question }}?\\n{% for s in choices.text %} {{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] }} {{ s }}\\n{% endfor %}Vastaus:\"\ninclude: _arc_challenge_fi_mcf_fbv2_yaml"
+  },
+  "arc_c/mcf/arc_challenge_fi_mcf_fbv2_p1.yaml": {
+   "sha256": "90fcf038589176cb80e5a49a4bcf3589953e5232325cdbd278bd70913b6396b7",
+   "text": "task: arc_challenge_fi_mcf_fbv2_p1\ndoc_to_text: \"{% for s in choices.text %}{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] }}: {{ s }}\\n{% endfor %}\\nVastaa seuraavaan kysymykseen k\u00e4ytt\u00e4en edell\u00e4 olevia vastausvaihtoehtoja. Kysymys: {{ question }}\\nVastaus:\"\ninclude: _arc_challenge_fi_mcf_fbv2_yaml"
+  },
+  "arc_c/mcf/arc_challenge_fi_mcf_fbv2_p2.yaml": {
+   "sha256": "4a783caca7279a68c19a5510aaa799d0217ffe32098b6764d522a97e76647caa",
+   "text": "task: arc_challenge_fi_mcf_fbv2_p2\ndoc_to_text: \"Kysymys: {{ question }}\\nValitse oikea vaihtoehto:\\n{% for s in choices.text %}{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] }}. {{ s }}\\n{% endfor %}Oikea vaihtoehto on:\"\ninclude: _arc_challenge_fi_mcf_fbv2_yaml"
+  },
+  "arc_c/mcf/arc_challenge_fi_mcf_fbv2_p3.yaml": {
+   "sha256": "f10d8a4580a11044afdfb60b6abed482d5cc17e29ad1a215eb4235941a632de3",
+   "text": "task: arc_challenge_fi_mcf_fbv2_p3\ndoc_to_text: \"T\u00e4ss\u00e4 on kysymys ja nelj\u00e4 vastausvaihtoehtoa. Valitse oikea.\\nKysymys: {{ question }}\\n{% for s in choices.text %}({{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] }}) {{ s }}\\n{% endfor %}Oikea vastaus on:\"\ninclude: _arc_challenge_fi_mcf_fbv2_yaml"
+  },
+  "arc_c/mcf/arc_challenge_fi_mcf_fbv2_p4.yaml": {
+   "sha256": "31e9eb0fe3233d24c7c6547a7ea910d9ac3ad3bd2b15a9d905a346a64b4679eb",
+   "text": "task: arc_challenge_fi_mcf_fbv2_p4\ndoc_to_text: \"Lue kysymys ja valitse oikea vastaus annettujen vaihtoehtojen joukosta.\\n{{ question }}\\nVaihtoehdot:\\n{% for s in choices.text %}{{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[loop.index0] }}: {{ s }}\\n{% endfor %}Vastaus:\"\ninclude: _arc_challenge_fi_mcf_fbv2_yaml"
+  },
+  "belebele_fin/cf/belebele_fin_cf_fbv2_p0.yaml": {
+   "sha256": "3d048c1462b54fad2dc9e9abcfb11ccae172f171792ded0320e91da180dda289",
+   "text": "task: belebele_fin_cf_fbv2_p0\ninclude: _belebele_fin_cf_yaml\ndoc_to_text: \"T\u00e4ss\u00e4 on teksti: {{flores_passage}}\\nKysymys: {{question}} perustuen tekstiin.\\nOikea vastaus:\"\n"
+  },
+  "belebele_fin/cf/belebele_fin_cf_fbv2_p1.yaml": {
+   "sha256": "3d8f9bc960736e04acb314299bfbecb519b81a2d0bd81f232ea79508e195683c",
+   "text": "task: belebele_fin_cf_fbv2_p1\ninclude: _belebele_fin_cf_yaml\ndoc_to_text: \"Lue seuraava teksti ja vastaa sen perusteella kysymykseen.\\n\\nTeksti: {{flores_passage}}\\n\\nKysymys: {{question}}\\nVastaus:\"\n"
+  },
+  "belebele_fin/cf/belebele_fin_cf_fbv2_p2.yaml": {
+   "sha256": "a863de23da9feef5dacf710aa693b332010bf2b085fe6f92b5f2af127340b561",
+   "text": "task: belebele_fin_cf_fbv2_p2\ninclude: _belebele_fin_cf_yaml\ndoc_to_text: \"Seuraavassa on teksti ja siihen liittyv\u00e4 kysymys. Vastaa kysymykseen.\\nTeksti: {{flores_passage}}\\nKysymys: {{question}}\\nVastaus:\"\n"
+  },
+  "belebele_fin/cf/belebele_fin_cf_fbv2_p3.yaml": {
+   "sha256": "41e6ae01c6f4a1eb71b8ee1bfe31d6e9d1dff6a913b9e014a0b1adcc063d70e7",
+   "text": "task: belebele_fin_cf_fbv2_p3\ninclude: _belebele_fin_cf_yaml\ndoc_to_text: \"{{flores_passage}}\\n\\nVastaa yll\u00e4 olevan tekstin perusteella kysymykseen: {{question}}\\nVastaus on:\"\n"
+  },
+  "belebele_fin/cf/belebele_fin_cf_fbv2_p4.yaml": {
+   "sha256": "b8c057193d486b5be402c4034b6092bc06ebb18152baa2887f6201bc371185e7",
+   "text": "task: belebele_fin_cf_fbv2_p4\ninclude: _belebele_fin_cf_yaml\ndoc_to_text: \"Lue katkelma ja vastaa kysymykseen omin sanoin.\\nKatkelma: {{flores_passage}}\\nKysymys: {{question}}\\nVastaus on:\"\n"
+  },
+  "belebele_fin/mcf/belebele_fin_mcf_fbv2_p0.yaml": {
+   "sha256": "7ca09e684f598f3ba329374a2ca0ecf9e403a7831caab2ec754ab73039245a79",
+   "text": "task: belebele_fin_mcf_fbv2_p0\ninclude: _belebele_fin_mcf_yaml\ndoc_to_text: \"Valitse tekstikatkelman perusteella oikea vastausvaihtoehto kysymykseen.\\n\\nTeksti: {{flores_passage}}\\n\\nKysymys: {{question}}\\n\\nVastausvaihtoehdot:\\n1: {{mc_answer1}}\\n2: {{mc_answer2}}\\n3: {{mc_answer3}}\\n4: {{mc_answer4}}\\n\\nVastaus: \"\n"
+  },
+  "belebele_fin/mcf/belebele_fin_mcf_fbv2_p1.yaml": {
+   "sha256": "b6c484821e057e43680dd1f6fcf34ff7de6103316e578d0afc584bb44dc75b49",
+   "text": "task: belebele_fin_mcf_fbv2_p1\ninclude: _belebele_fin_mcf_yaml\ndoc_to_text: \"Lue seuraava teksti ja vastaa kysymykseen valitsemalla oikea vaihtoehto.\\nTeksti: {{flores_passage}}\\nKysymys: {{question}}\\nVaihtoehdot:\\n1. {{mc_answer1}}\\n2. {{mc_answer2}}\\n3. {{mc_answer3}}\\n4. {{mc_answer4}}\\nOikea vastaus on: \"\n"
+  },
+  "belebele_fin/mcf/belebele_fin_mcf_fbv2_p2.yaml": {
+   "sha256": "2d70daa56bda9a0273a2cb0c00c6bf95a4556fb0110cb17b82125246b1778fa1",
+   "text": "task: belebele_fin_mcf_fbv2_p2\ninclude: _belebele_fin_mcf_yaml\ndoc_to_text: \"T\u00e4ss\u00e4 on teksti ja siihen liittyv\u00e4 kysymys. Mik\u00e4 on oikea vastaus?\\n{{flores_passage}}\\n\\nKysymys: {{question}}\\n\\nValinnat:\\n1) {{mc_answer1}}\\n2) {{mc_answer2}}\\n3) {{mc_answer3}}\\n4) {{mc_answer4}}\\nVastaus: \"\n"
+  },
+  "belebele_fin/mcf/belebele_fin_mcf_fbv2_p3.yaml": {
+   "sha256": "50b15874fabe28ede491853ca86e24de729e3838a4252bec8d88bddea7562ea8",
+   "text": "task: belebele_fin_mcf_fbv2_p3\ninclude: _belebele_fin_mcf_yaml\ndoc_to_text: \"{{flores_passage}}\\n\\nYll\u00e4 olevan tekstin perusteella vastaa kysymykseen: {{question}}\\n1. {{mc_answer1}}\\n2. {{mc_answer2}}\\n3. {{mc_answer3}}\\n4. {{mc_answer4}}\\nValitse oikea vaihtoehto: \"\n"
+  },
+  "belebele_fin/mcf/belebele_fin_mcf_fbv2_p4.yaml": {
+   "sha256": "3e8e344ca8768a034591fd4d73bc5d72f5ed77bf63c9f015c8a05bacf63d51a1",
+   "text": "task: belebele_fin_mcf_fbv2_p4\ninclude: _belebele_fin_mcf_yaml\ndoc_to_text: \"Vastaa kysymykseen, \\\"{{question}}\\\", k\u00e4ytt\u00e4en vain teksti\u00e4: \\\"{{flores_passage}}\\\".\\n Valitse yksi seuraavista numeroista.\\n 1. {{mc_answer1}}\\n 2. {{mc_answer2}}\\n 3. {{mc_answer3}}\\n 4. {{mc_answer4}}\\n Oikea vaihtoehto: \"\n"
+  },
+  "goldenswag/cf/goldenswag_fi_cf_fbv2_p0.yaml": {
+   "sha256": "1ff37973ec8154d0819d6fcbf1eba1651302f9ad6b38d5350a1276968dabc7d3",
+   "text": "task: goldenswag_ht_fi_cf_fbv2_p0\ndoc_to_text: \"Kerro loogisin jatko seuraavalle tekstille:\\n\\n{{ query }}\\n\\nJatko:\"\ninclude: _goldenswag_fi_cf_yaml"
+  },
+  "goldenswag/cf/goldenswag_fi_cf_fbv2_p1.yaml": {
+   "sha256": "22a27575d2d022e0143de4994172607ddcd84ffc77c9dbc3b6f391c001860bd8",
+   "text": "task: goldenswag_ht_fi_cf_fbv2_p1\ndoc_to_text: \"Aloitus: {{ query }} Lopetus:\"\ninclude: _goldenswag_fi_cf_yaml"
+  },
+  "goldenswag/cf/goldenswag_fi_cf_fbv2_p2.yaml": {
+   "sha256": "60bbde928daa0bda299561b2239a2dba6b67c9ee3e04041e360c120a1cfea045",
+   "text": "task: goldenswag_ht_fi_cf_fbv2_p2\ndoc_to_text: \"Jatka teksti\u00e4 mahdollisimman luontevasti.\\n\\n{{ query }}\\n\\nJatko:\"\ninclude: _goldenswag_fi_cf_yaml"
+  },
+  "goldenswag/cf/goldenswag_fi_cf_fbv2_p3.yaml": {
+   "sha256": "c549260c240b6858bd55445ce3f1cd33accea43a8bd5e9410717b577901f91a6",
+   "text": "task: goldenswag_ht_fi_cf_fbv2_p3\ndoc_to_text: \"Miten t\u00e4m\u00e4 teksti jatkuu?\\n\\n{{ query }}\\n\\nJatko:\"\ninclude: _goldenswag_fi_cf_yaml"
+  },
+  "goldenswag/cf/goldenswag_fi_cf_fbv2_p4.yaml": {
+   "sha256": "d6dfddf4f7aec301ca7ddc88595b6a8819032a0190a21c3f7c4a66210e48abb6",
+   "text": "task: goldenswag_ht_fi_cf_fbv2_p4\ndoc_to_text: \"Kirjoita seuraava teksti loppuun.\\n\\n{{ query }}\\n\\nJatko:\"\ninclude: _goldenswag_fi_cf_yaml"
+  },
+  "goldenswag/cf/ogx_goldenswagx_utils.py": {
+   "sha256": "5d1598703c5a6fe0088dd10e40529f1ab30df1a1cfb508c0f1c2ad55190ebafc",
+   "text": "import datasets\nimport re\n\n\ndef preprocess(text):\n    text = text.strip()\n    # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.\n    text = text.replace(\" [title]\", \". \")\n    text = re.sub(\"\\\\[.*?\\\\]\", \"\", text)\n    text = text.replace(\"  \", \" \")\n    return text\n\n\ndef process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n    def _process_doc(doc):\n        ctx = doc[\"ctx_a\"] + \" \" + doc[\"ctx_b\"].capitalize()\n        out_doc = {\n            \"query\": preprocess(doc[\"activity_label\"] + \": \" + ctx),\n            \"choices\": [preprocess(ending) for ending in doc[\"endings\"]],\n            \"gold\": int(doc[\"label\"]),\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)\n"
+  },
+  "goldenswag/mcf/goldenswag_fi_mcf_fbv2_p0.yaml": {
+   "sha256": "ee196404099c427bfed2fca288909b4bb6d2a497fb7f8d6576c05355e114379f",
+   "text": "task: goldenswag_ht_fi_mcf_fbv2_p0\ndoc_to_text: \"{{ query }}\\n\\nValitse seuraavista vaihtoehdoista loogisin jatko edelliselle tekstille.\\nA: {{ choices[0] }}\\nB: {{ choices[1] }}\\nC: {{ choices[2] }}\\nD: {{ choices[3] }}\\n\\nVastaus:\"\ninclude: _goldenswag_fi_mcf_yaml"
+  },
+  "goldenswag/mcf/goldenswag_fi_mcf_fbv2_p1.yaml": {
+   "sha256": "ad3a9346ab91b174e675d21e48f8c8c17c46652eba6ae5a2cca95bd5d3df798c",
+   "text": "task: goldenswag_ht_fi_mcf_fbv2_p1\ndoc_to_text: \"Mik\u00e4 seuraavista vaihtoehdoista parhaiten jatkaa alla olevaa teksti\u00e4?\\nTeksti: {{ query }}\\n\\nVaihtoehdot:\\nA. {{ choices[0] }}\\nB. {{ choices[1] }}\\nC. {{ choices[2] }}\\nD. {{ choices[3] }}\\nVastaus:\"\ninclude: _goldenswag_fi_mcf_yaml"
+  },
+  "goldenswag/mcf/goldenswag_fi_mcf_fbv2_p2.yaml": {
+   "sha256": "87d4d9e8f97cf5ede77e53517acebe8204c8190430933f9d916f7574a7d49dc8",
+   "text": "task: goldenswag_ht_fi_mcf_fbv2_p2\ndoc_to_text: \"T\u00e4ss\u00e4 on tekstin alku: \\\"{{ query }}\\\". Mik\u00e4 seuraavista on paras lopetus sille?\\nA) {{ choices[0] }}\\nB) {{ choices[1] }}\\nC) {{ choices[2] }}\\nD) {{ choices[3] }}\\nParas lopetus:\"\ninclude: _goldenswag_fi_mcf_yaml"
+  },
+  "goldenswag/mcf/goldenswag_fi_mcf_fbv2_p3.yaml": {
+   "sha256": "56053f5eb9e1d6cd588a0aec5330f3660d40009485de8cffb0038f4b3ef89515",
+   "text": "task: goldenswag_ht_fi_mcf_fbv2_p3\ndoc_to_text: \"Teksti: {{ query }}\\n Mik\u00e4 on j\u00e4rkevin jatkumo yll\u00e4olevalle tekstille?: Vaihtoehdot:\\nA. {{ choices[0] }}\\nB. {{ choices[1] }}\\nC. {{ choices[2] }}\\nD. {{ choices[3] }}\\nValinta:\"\ninclude: _goldenswag_fi_mcf_yaml"
+  },
+  "goldenswag/mcf/goldenswag_fi_mcf_fbv2_p4.yaml": {
+   "sha256": "2133ba8e35d1b1cbf6b7af8a5c3ca62284aaec4f1dc2ee8da0a6454b43cb9884",
+   "text": "task: goldenswag_ht_fi_mcf_fbv2_p4\ndoc_to_text: \"Lue tekstin alku ja valitse sopivin jatko-osa.\\nAlku: {{ query }}\\n\\nJatko-osat:\\nA: {{ choices[0] }}\\nB: {{ choices[1] }}\\nC: {{ choices[2] }}\\nD: {{ choices[3] }}\\nOikea jatko-osa:\"\ninclude: _goldenswag_fi_mcf_yaml"
+  },
+  "goldenswag/mcf/ogx_goldenswagx_utils.py": {
+   "sha256": "5d1598703c5a6fe0088dd10e40529f1ab30df1a1cfb508c0f1c2ad55190ebafc",
+   "text": "import datasets\nimport re\n\n\ndef preprocess(text):\n    text = text.strip()\n    # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.\n    text = text.replace(\" [title]\", \". \")\n    text = re.sub(\"\\\\[.*?\\\\]\", \"\", text)\n    text = text.replace(\"  \", \" \")\n    return text\n\n\ndef process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n    def _process_doc(doc):\n        ctx = doc[\"ctx_a\"] + \" \" + doc[\"ctx_b\"].capitalize()\n        out_doc = {\n            \"query\": preprocess(doc[\"activity_label\"] + \": \" + ctx),\n            \"choices\": [preprocess(ending) for ending in doc[\"endings\"]],\n            \"gold\": int(doc[\"label\"]),\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)\n"
+  },
+  "scandisent/cf/scandisent_fi_cf_fbv2_p0.yaml": {
+   "sha256": "e4c41da4817f0d2b0d99f7e53915dad11483ccf34dbbe3ee1edd7175d874e261",
+   "text": "task: scandisent_fi_cf_fbv2_p0\ndoc_to_text: \"Arvostelijan teksti: {{ query }}\\nTunne:\"\ninclude: _scandisent_fi_cf_yaml"
+  },
+  "scandisent/cf/scandisent_fi_cf_fbv2_p1.yaml": {
+   "sha256": "85a3cf213b44dd79f332073cd0d637234790d4a9f78abb4706607cb6673f15ea",
+   "text": "task: scandisent_fi_cf_fbv2_p1\ndoc_to_text: \"Arvostelu: {{ query }}\\nArvostelun tunnes\u00e4vy on:\"\ninclude: _scandisent_fi_cf_yaml"
+  },
+  "scandisent/cf/scandisent_fi_cf_fbv2_p2.yaml": {
+   "sha256": "8930cd6ad4b8433025d997e10d64f3ebfa1369ebe3d740534cfb2c7d29378ca5",
+   "text": "task: scandisent_fi_cf_fbv2_p2\ndoc_to_text: \"Mik\u00e4 on seuraavan arvostelun s\u00e4vy?\\n\\\"{{ query }}\\\"\\nS\u00e4vy:\"\ninclude: _scandisent_fi_cf_yaml"
+  },
+  "scandisent/cf/scandisent_fi_cf_fbv2_p3.yaml": {
+   "sha256": "c93901958249185ae0e851c40da69f3bb73468ac9a2cdbc684f44d41e39a6f87",
+   "text": "task: scandisent_fi_cf_fbv2_p3\ndoc_to_text: \"Saat luettavaksesi arvostelun. Teht\u00e4v\u00e4si on m\u00e4\u00e4ritell\u00e4 arvostelun tunnes\u00e4vy.\\n{{ query }}\\nTunnes\u00e4vy on:\"\ninclude: _scandisent_fi_cf_yaml"
+  },
+  "scandisent/cf/scandisent_fi_cf_fbv2_p4.yaml": {
+   "sha256": "365a26c8e601e905ef2106a8a697db03ab241f126fc4aabb77776c31b5f22a9d",
+   "text": "task: scandisent_fi_cf_fbv2_p4\ndoc_to_text: \"Analysoi t\u00e4m\u00e4n arvostelun tunne: {{ query }}\\nTunne:\"\ninclude: _scandisent_fi_cf_yaml"
+  },
+  "scandisent/cf/scandisent_fi_utils.py": {
+   "sha256": "6336430357816b7b90523381f3afb6f6591f4aa023c708e10713e4c6cd9ff7a2",
+   "text": "import datasets\n\ndef process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n    def _process_doc(doc):\n        label_map = {\n            \"positive\": \"positiivinen\",\n            \"negative\": \"negatiivinen\"\n        }\n\n        out_doc = {\n            \"query\": doc['text'],\n            \"choices\": [label_map['positive'], label_map['negative']],\n            \"gold\": label_map[doc['label']]\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)"
+  },
+  "scandisent/mcf/scandisent_fi_mcf_pbv2_p0.yaml": {
+   "sha256": "a0fe822a236c03c590384156cb10a2966528a510d6631159f2bded834880af26",
+   "text": "task: scandisent_fi_mcf_fbv2_p0\ndoc_to_text: \"Onko tekstiss\u00e4 esiintyv\u00e4 tunne \\\"positiivinen\\\" vai \\\"negatiivinen\\\"?\\nTeksti: {{ query }}\\nTunne:\"\ninclude: _scandisent_fi_mcf_yaml"
+  },
+  "scandisent/mcf/scandisent_fi_mcf_pbv2_p1.yaml": {
+   "sha256": "cc978bb7aedf5bf11a27c55bf1fa115710d310420b3c96ae000e4bf012a1ef91",
+   "text": "task: scandisent_fi_mcf_fbv2_p1\ndoc_to_text: \"P\u00e4\u00e4ttele seuraavan tekstin tunnes\u00e4vy. Vastaa joko \\\"positiivinen\\\" tai \\\"negatiivinen\\\".\\nTeksti: {{ query }}\\nTunnes\u00e4vy:\"\ninclude: _scandisent_fi_mcf_yaml"
+  },
+  "scandisent/mcf/scandisent_fi_mcf_pbv2_p2.yaml": {
+   "sha256": "810aaab63f98922d48d1460c199c9815655a0221c0a99e43f46c3f4bd241173f",
+   "text": "task: scandisent_fi_mcf_fbv2_p2\ndoc_to_text: \"Luokittele seuraava arvostelu joko positiiviseksi tai negatiiviseksi.\\nTeksti: {{ query }}\\nS\u00e4vy:\"\ninclude: _scandisent_fi_mcf_yaml"
+  },
+  "scandisent/mcf/scandisent_fi_mcf_pbv2_p3.yaml": {
+   "sha256": "a0a86be77016f5da6701b38d8bf51e6541e301281780ab28d922504bfc46f42e",
+   "text": "task: scandisent_fi_mcf_fbv2_p3\ndoc_to_text: \"Arvostelu: {{ query }}\\nOnko arvostelu s\u00e4vylt\u00e4\u00e4n \\\"positivinen\\\" vai \\\"negatiivinen\\\"?\\nS\u00e4vy:\"\ninclude: _scandisent_fi_mcf_yaml"
+  },
+  "scandisent/mcf/scandisent_fi_mcf_pbv2_p4.yaml": {
+   "sha256": "a5a5caebe681912152290d433dbd873d5e7b96a9fd8abe8a90bcc1d9116ce069",
+   "text": "task: scandisent_fi_mcf_fbv2_p4\ndoc_to_text: \"Valitse t\u00e4t\u00e4 arvostelua kuvaava s\u00e4vy: \\\"{{ query }}\\\"\\nOnko se \\\"positiivinen\\\" vai \\\"negatiivinen\\\"?\\nS\u00e4vy:\"\ninclude: _scandisent_fi_mcf_yaml"
+  },
+  "scandisent/mcf/scandisent_fi_utils.py": {
+   "sha256": "6336430357816b7b90523381f3afb6f6591f4aa023c708e10713e4c6cd9ff7a2",
+   "text": "import datasets\n\ndef process_docs(dataset: datasets.Dataset) -> datasets.Dataset:\n    def _process_doc(doc):\n        label_map = {\n            \"positive\": \"positiivinen\",\n            \"negative\": \"negatiivinen\"\n        }\n\n        out_doc = {\n            \"query\": doc['text'],\n            \"choices\": [label_map['positive'], label_map['negative']],\n            \"gold\": label_map[doc['label']]\n        }\n        return out_doc\n\n    return dataset.map(_process_doc)"
+  },
+  "sib200/cf/sib200_fi_cf_fbv2_p0.yaml": {
+   "sha256": "b7273d3dc67279c9268590ba2deee3229321196922bad2524349cd88da181863",
+   "text": "task: sib200_fi_cf_fbv2_p0\ndoc_to_text: \"P\u00e4\u00e4ttele, mit\u00e4 aihetta seuraava uutinen k\u00e4sittelee. Uutinen: {{ text }}\\nAihe:\"\ninclude: _sib200_fi_cf_yaml"
+  },
+  "sib200/cf/sib200_fi_cf_fbv2_p1.yaml": {
+   "sha256": "8ecbe75dafdcef3e9fca1d3b8cf665d982c414c2460f99f282d5b6ddc5ea53dc",
+   "text": "task: sib200_fi_cf_fbv2_p1\ndoc_to_text: \"Teksti: \\\"{{ text }}\\\"\\nMist\u00e4 aiheesta teksti kertoo?\\nAihe:\"\ninclude: _sib200_fi_cf_yaml"
+  },
+  "sib200/cf/sib200_fi_cf_fbv2_p2.yaml": {
+   "sha256": "4b8662fc3904de9f45448c2d126120a283d2ed223b43ab62eb1c8ee7c37c46af",
+   "text": "task: sib200_fi_cf_fbv2_p2\ndoc_to_text: \"Lue t\u00e4m\u00e4 uutinen ja kerro mist\u00e4 aiheesta se on kirjoitettu.\\n{{ text }}\\n\"\ninclude: _sib200_fi_cf_yaml"
+  },
+  "sib200/cf/sib200_fi_cf_fbv2_p3.yaml": {
+   "sha256": "7ca4b0c97205f3717484eb4f807653dbcdeae09ab529c43586d7d8bb997b8ad8",
+   "text": "task: sib200_fi_cf_fbv2_p3\ndoc_to_text: \"Mik\u00e4 on t\u00e4m\u00e4n artikkelin aihe?\\nArtikkeli: {{ text }}\\nAihe:\"\ninclude: _sib200_fi_cf_yaml"
+  },
+  "sib200/cf/sib200_fi_cf_fbv2_p4.yaml": {
+   "sha256": "ed90eae7e9c78ab9c0b66369dda8fde8ce074b34f59722faf36ed72ab9d8e45d",
+   "text": "task: sib200_fi_cf_fbv2_p4\ndoc_to_text: \"Saat luettavaksesi tekstin, ja teht\u00e4v\u00e4si on m\u00e4\u00e4ritt\u00e4\u00e4 sille kategoria.\\nTeksti: {{ text }}\\nKategoria:\"\ninclude: _sib200_fi_cf_yaml"
+  },
+  "sib200/mcf/sib200_fi_mcf_fbv2_p0.yaml": {
+   "sha256": "5b07f2707a3d0e753e8e5b88856dce026cc756e84194d087d7e5c967cf63e75c",
+   "text": "task: sib200_fi_mcf_fbv2_p0\ndoc_to_text: \"Onko tekstin aihe \\\"politiikka\\\", \\\"viihde\\\", \\\"tiede/teknologia\\\", \\\"urheilu\\\", \\\"matkailu\\\", \\\"terveys\\\" vai \\\"maantiede\\\"?\\n{{ text }}\\n\"\ninclude: _sib200_fi_mcf_yaml"
+  },
+  "sib200/mcf/sib200_fi_mcf_fbv2_p1.yaml": {
+   "sha256": "a1d90eefdc2b55c4f2888c4467dd819d6f55746a86eabd8ba2a75c918fea0fd1",
+   "text": "task: sib200_fi_mcf_fbv2_p1\ndescription: \"Aihelista: politiikka, viihde, tiede/teknologia, urheilu, matkailu, terveys, maantiede. Valitse seuraaville teksteille sopivin aihe.\\n\\n\"\ndoc_to_text: \"Teksti: {{ text }}\\nAihe:\"\ninclude: _sib200_fi_mcf_yaml"
+  },
+  "sib200/mcf/sib200_fi_mcf_fbv2_p2.yaml": {
+   "sha256": "786abc5f11c10d21558e216b14826253166617332b0540cbe4a75e59469adcaa",
+   "text": "task: sib200_fi_mcf_fbv2_p2\ndoc_to_text: \"T\u00e4ss\u00e4 on uutisartikkeli: {{ text }}\\nMihin kategoriaan se kuuluu: politiikka, viihde, tiede/teknologia, urheilu, matkailu, terveys vai maantiede?\\nKategoria:\"\ninclude: _sib200_fi_mcf_yaml"
+  },
+  "sib200/mcf/sib200_fi_mcf_fbv2_p3.yaml": {
+   "sha256": "720abf71d92b6109a31b73da17dcbbbf89a9601ed846b7455d20e1f75ac445dd",
+   "text": "task: sib200_fi_mcf_fbv2_p3\ndoc_to_text: \"Teksti: \\\"{{text}}\\\"\\nValitse tekstin aihe seuraavista: politiikka, viihde, tiede/teknologia, urheilu, matkailu, terveys, maantiede.\\nAihe:\"\ninclude: _sib200_fi_mcf_yaml"
+  },
+  "sib200/mcf/sib200_fi_mcf_fbv2_p4.yaml": {
+   "sha256": "aeac753b9778893bdc42ac0f4206d8fc95b33e644cd5ed7f8e60ce9c5bd75e8e",
+   "text": "task: sib200_fi_mcf_fbv2_p4\ndoc_to_text: \"Luokittele artikkeli johonkin seuraavista luokista: politiikka, viihde, tiede/teknologia, urheilu, matkailu, terveys, maantiede.\\nArtikkeli: {{ text }}\\nLuokka:\"\ninclude: _sib200_fi_mcf_yaml"
+  }
+ },
+ "source": "LumiOpen/lm-evaluation-harness"
+}

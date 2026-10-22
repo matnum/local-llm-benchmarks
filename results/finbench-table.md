@@ -1,6 +1,10 @@
-# FIN-bench-v2 — Finnish capability (run `fi-20261003`)
+# FIN-bench-v2 — Finnish capability
 
-`cf` formulation, prompt variant `p0`, scored by `tools/score_ll` (pinned llama.cpp logits). Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of the choice text, `acc_norm` divides by the choice's character length, exactly as `lm_eval/api/task.py` does. Items per task: 900, 1000, 1004, 2048, 2344.
+Scored by `tools/score_ll` (pinned llama.cpp logits) from the upstream templates vendored in `docs/finbench/`. Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of the choice text, `acc_norm` divides by the choice's character length, exactly as `lm_eval/api/task.py` does. Items per task: 900, 1000, 1004, 2048, 2344. Pilots are excluded.
+
+## `cf` / `p0`
+
+Run `fi-20261003`.
 
 | model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
 |---|---|---|---|---|---|---|
@@ -9,3 +13,11 @@
 | poro2-8b-q8_0 | 0.396 / 0.420 | 0.469 / 0.417 | 0.587 / 0.638 | 0.942 / 0.942 | 0.356 / 0.263 | 0.550 |
 | poro2-8b-q4_k_m | 0.389 / 0.420 | 0.452 / 0.407 | 0.579 / 0.630 | 0.922 / 0.922 | 0.306 / 0.217 | 0.530 |
 | qwen3-8b-q4_k_m | 0.310 / 0.364 | 0.434 / 0.410 | 0.389 / 0.344 | 0.499 / 0.499 | 0.515 / 0.611 | 0.430 |
+
+## `mcf` / `p0`
+
+Run `fi-mcf-p0-20261021`.
+
+| model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
+|---|---|---|---|---|---|---|
+| poro2-8b-q4_k_m | 0.466 / 0.424 | 0.239 / 0.239 | 0.335 / 0.199 | 0.811 / 0.811 | 0.372 / 0.253 | 0.445 |

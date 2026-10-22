@@ -178,10 +178,12 @@ ROCm runs hotter throughout: 83–91 °C across the ten cells against 69–85 °
 Vulkan, with the Qwen3-4B cell the hottest measured at 91 °C. Temperature is
 logged per run.
 
-> **Before quoting a TTFT, read [docs/RUNNING.md](docs/RUNNING.md) §7.** On
-> Vulkan the first timed request is much faster than the next two, so the mean is
-> misleading; this table reports the median, and `results/table.md` prints both
-> the mean and the p50. That Vulkan spread is an open finding, not a harness bug.
+> **The TTFT column is not a like-for-like latency figure — read
+> [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it.** On Vulkan, a request that
+> follows a long generation pays KV-cache bookkeeping: ~0.9 s per request on the
+> Qwen3.8-27B cell with q8 KV, ~0.3 s with f16 KV, and that cost dominates its number.
+> Medians are reported and per-request values are in `results/table.md`; do not compare
+> TTFT across cells or backends in this table.
 
 ## Charts
 
@@ -371,9 +373,16 @@ What is pinned, and where:
 - **Two contexts.** `llama-bench` runs at the model-default context (4096) and
   `llama-server` at 8192. Do not compare a bench number to a server number as if
   they were measured at the same context.
-- **Vulkan TTFT spread.** The first timed request is much faster than the next
-  two on Vulkan, so the mean is misleading; medians are reported and the
-  per-request values are in `results/table.md`. An open finding, not a bug.
+- **TTFT mixes prefill with per-request KV work on Vulkan.** A request that follows a
+  long generation pays KV-cache bookkeeping: on the Qwen3.8-27B cell, ~0.79 s per
+  request plus ~0.9 s after every 512-token generation with q8 KV; with f16 KV those
+  fall to ~0.14 s and ~0.28 s. The 32B cell shows no q8-vs-f16 difference, so the
+  column is not comparable across cells or backends, and for the 27B cell it is
+  dominated by cache work rather than latency.
+- **Numbers are stack-stamped.** The tracked tables were measured on kernel 7.2.8 /
+  Mesa 26.2.3; this machine now runs 7.2.10 / 26.2.4, where re-checked cells are
+  8–11% lower on `pp2048` while `tg512` is unchanged. Re-measure before mixing new
+  runs into the published tables.
 - **No error bars.** Three repeats catch a broken run; they do not support a 1%
   claim. Differences under ~2% are within noise for this setup.
 - **FIN-bench is one formulation.** `cf` at prompt variant `p0` only. `mcf` and
@@ -424,8 +433,10 @@ metadata is in [CITATION.cff](CITATION.cff):
 - **An English/general quality axis** — strict-JSON extraction, function
   calling, and a GSM8K-style math subset over the same cells.
 - **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.
-- **Vulkan TTFT root cause** — one experiment to separate prompt-cache reuse
-  from a per-request Vulkan cost.
+- **TTFT measurement protocol** — the root cause of the Vulkan inflation is narrowed
+  (KV trim after long generations; quantisation-dependent on the 27B). Remaining:
+  choose f16 KV or a cold-request protocol, re-probe the ten cells, and republish the
+  column with its KV type stated.
 - **Wider matrix.** One-time downloads, not yet swept: gpt-oss-20b (MXFP4),
   Qwen3-30B-A3B (Q4_K_M), Llama 3.1 8B (Q8_0), Mistral Small 3.2 24B (Q4_K_M),
   Gemma 3 27B (Q4_K_M), Llama 3.3 70B (Q4_K_M).

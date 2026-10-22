@@ -2,6 +2,12 @@
 
 Verified 2026-09-30 on the reference machine (the hardware under test).
 
+> **This is the measurement-time snapshot, not the current machine.** As of 2026-10-22 the
+> same box runs kernel 7.2.10-1 and Mesa 26.2.4 (RADV `STRIX_HALO`). Every tracked result
+> was measured on the versions below; re-checked cells on the newer stack are 8–11% lower on
+> `pp2048` with `tg512` unchanged (see [RUNNING.md §7](RUNNING.md)). Do not compare a new
+> run against these tables without re-measuring the rest.
+
 | Item | Value |
 |---|---|
 | Host | reference host |

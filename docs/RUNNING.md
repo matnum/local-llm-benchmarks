@@ -189,15 +189,35 @@ so a stale figure cannot ship with fresh numbers.
   therefore **understates** the energy cost of prompt processing.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
-- **TTFT has a wide per-request spread on Vulkan — read the median, not just the mean.** With
-  an identical prompt repeated three times, Vulkan's first timed request lands near the
-  prefill prediction and requests 2-3 take 2–12x longer to first token, while ROCm runs flat
-  (measured 2026-10-02; e.g. `qwen3.8-27b-q5_k_xl`, prefill prediction ≈ 134 ms — Vulkan
-  `[787, 1632, 1634]` ms, ROCm `[137, 196, 135]` ms). Generation rate is unaffected
-  (`gen_tps` is identical across the three requests). `consolidated.csv` carries both
-  `ttft_ms` (mean) and `ttft_ms_p50` (median) for this reason; the per-request values are in
-  `ttft.json`. Root cause not yet investigated — that is a Vulkan-side question, not a
-  harness one.
+- **TTFT is per-request state, not just latency: on Vulkan it includes KV-cache bookkeeping.**
+  Measured 2026-10-22 on the Qwen3.8-27B q5 cell (Vulkan, three 512-token requests, q8 KV): the
+  server logs a **1-token** prompt eval of ~785 ms and TTFT is 787 ms on the first request, then
+  1707 / 1706 ms — an extra ~905 ms that the server attributes to neither prefill nor decode.
+  Two single-variable runs isolate the trigger (values are TTFT / logged prompt-eval / difference):
+
+  | condition | TTFT (3 requests) | prompt eval | TTFT − prompt eval |
+  |---|---|---|---|
+  | 512-token generations, q8 KV | 787 / 1707 / 1706 ms | 785 / 802 / 802 ms | 2 / 905 / 903 ms |
+  | 32-token generations, q8 KV | 813 / 804 / 785 ms | 811 / 802 / 783 ms | 2 / 2 / 2 ms |
+  | 512-token generations, f16 KV | 141 / 417 / 417 ms | 139 / 134 / 133 ms | 2 / 284 / 284 ms |
+
+  So (a) the stall needs a **long preceding generation** — the prompt itself is not the trigger, it is
+  the KV trim/rollback that follows 512 generated tokens; and (b) **quantised KV is ~85% of the
+  cost** on this cell (base 790 → 135 ms, stall 905 → 284 ms), while generation rate is identical in
+  every arm (10.46–10.52 tok/s). The same q8→f16 swap on the 32B cell changes nothing (overhead
+  73 → 76 ms), so this is a **model-specific** cost, not a general Vulkan penalty. ROCm stays flat
+  (2–73 ms) on the same cells.
+
+  **Consequence:** `ttft_ms` (mean) and `ttft_ms_p50` (median) mix prompt prefill with per-request KV
+  work. Do not compare them across cells or backends, and any future TTFT measurement must state its
+  KV type. Per-request values are in `ttft.json`. This supersedes the 2026-10-02 note that described
+  "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
+- **Numbers are stack-stamped.** The tracked rows were measured on kernel 7.2.8 / Mesa 26.2.3
+  (`docs/env.md`). The machine now runs kernel 7.2.10 / Mesa 26.2.4, where re-checking one cell per
+  size gives **pp2048 8–11% lower** (27B 328.65 → 293.75, 32B 264.51 → 242.41 tok/s) while **tg512 is
+  unchanged** (10.60 → 10.56, 9.71 → 9.71). Do not mix new runs into the published tables without
+  re-measuring the rest first, and stamp the stack in any new `run.json`.
+
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets
   `HSA_OVERRIDE_GFX_VERSION=11.5.0`); if it still fails, treat ROCm as a bonus axis per PLAN.

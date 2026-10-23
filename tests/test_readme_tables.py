@@ -19,20 +19,21 @@ README = os.path.join(REPO, "README.md")
 ROLLUP = os.path.join(REPO, "results", "consolidated.csv")
 FIN_ROLLUP = os.path.join(REPO, "results", "finbench-consolidated.csv")
 
-THROUGHPUT_HEADER = "| Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |"
+THROUGHPUT_HEADER = "| Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | peak GPU GiB |"
 FIN_HEADER = "| Model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |"
 TASKS = ("arc_c", "belebele_fin", "goldenswag", "scandisent", "sib200")
 
 # Column index -> (rollup metric, tolerance). Tolerances are display rounding,
-# not equality: the README prints 1-2 decimals.
+# not equality: the README prints 1-2 decimals. The memory column (index 7) is
+# checked separately: it is residency (mem_peak_gib), not the VRAM pool.
 THROUGHPUT_COLUMNS = (
     (2, "pp2048_bench_tps", 0.06),
     (3, "tg512_bench_tps", 0.006),
     (4, "tg_server_tps", 0.006),
     (5, "ttft_ms_p50", 0.06),
     (6, "tok_per_w", 0.006),
-    (7, "vram_peak_gib", 0.006),
 )
+MEM_COLUMN = 7
 
 
 def _rows(text, header):
@@ -83,6 +84,29 @@ class ReadmeTablesTest(unittest.TestCase):
                         shown, self.vals[key][metric], delta=tol,
                         msg=f"README {cell}/{backend} {metric} = {shown}, "
                             f"rollup differs")
+
+    def test_memory_column_is_residency_not_the_vram_pool(self):
+        """The memory column must be residency (VRAM + GTT), not the dead counter.
+
+        On the 1 GiB carve-out `mem_info_vram_used` sits at its idle floor, so a
+        table built from `vram_peak_gib` reads 0.5-1 GiB of "VRAM" for every cell
+        including the 59 GiB one: plausible-looking and wrong. Pin the column to
+        `mem_peak_gib`, and fail loudly when a cell has no residency row at all
+        rather than silently falling back to the pool.
+        """
+        rows = _rows(self.text, THROUGHPUT_HEADER)
+        self.assertEqual(len(rows), 20, "expected ten cells x two backends")
+        for row in rows:
+            key = (_clean(row[0]), row[1])
+            with self.subTest(cell=key[0], backend=key[1]):
+                self.assertIn(key, self.vals, f"{key[0]}/{key[1]} has no rollup rows")
+                self.assertIn(
+                    "mem_peak_gib", self.vals[key],
+                    f"{key[0]}/{key[1]} has no mem_peak_gib — the table would publish "
+                    f"the VRAM pool, which is not residency")
+                self.assertAlmostEqual(
+                    float(row[MEM_COLUMN]), self.vals[key]["mem_peak_gib"], delta=0.006,
+                    msg=f"README {key[0]}/{key[1]} peak GPU GiB drifted from mem_peak_gib")
 
     def test_finbench_table_matches_rollup(self):
         fin = {}

@@ -1,16 +1,16 @@
 # Results
 
-> Rollup built by harness `485397785280`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50.
+> Rollup built by harness `da7ad4f45748`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = peak (VRAM + GTT), the residency figure; runs that predate GTT sampling show the VRAM pool only.
 
 ## run-20261002-1719 — rocm
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | qwen3.8-27b-q5_k_xl | Q5_K_XL | 341.05 | 10.36 | 10.23 | 145.3 | 137.9 | 85.1 | 0.12 | 19.65 |
 
 ## run-20261002-1734 — vulkan
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | gpt-oss-120b-mxfp4 | MXFP4 (native) | 780.42 | 55.12 | 53.18 | 124.0 | 143.9 | 85.6 | 0.62 | 59.09 |
 | qwen3-coder-30b-a3b-q6_k | Q6_K | 1140.09 | 74.75 | 71.46 | 114.8 | 162.8 | 80.7 | 0.89 | 23.76 |
@@ -20,7 +20,7 @@
 
 ## run-20261002-1751 — rocm
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | gpt-oss-120b-mxfp4 | MXFP4 (native) | 906.9 | 51.46 | 49.59 | 68.1 | 67.2 | 86.1 | 0.58 | 59.36 |
 | qwen3-coder-30b-a3b-q6_k | Q6_K | 1288.43 | 63.2 | 58.59 | 24.7 | 22.5 | 86.5 | 0.68 | 24.12 |
@@ -30,7 +30,7 @@
 
 ## run-20261003-1543 — vulkan
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | eurollm-9b-q8_0 | Q8_0 | 911.37 | 23.54 | 23.06 | 130.2 | 48.7 | 85.1 | 0.27 | 9.48 |
 | poro2-8b-q8_0 | Q8_0 | 1025.83 | 27.13 | 26.61 | 169.6 | 234.3 | 84.7 | 0.31 | 8.21 |
@@ -39,7 +39,7 @@
 
 ## run-20261003-1556 — rocm
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | eurollm-9b-q8_0 | Q8_0 | 1089.07 | 23.02 | 22.57 | 50.5 | 47.2 | 85.2 | 0.26 | 9.74 |
 | poro2-8b-q8_0 | Q8_0 | 1277.2 | 26.65 | 26.16 | 43.0 | 41.9 | 85.2 | 0.31 | 8.47 |
@@ -48,12 +48,42 @@
 
 ## run-20261003-1718 — vulkan
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | poro2-70b-q4_k_m | Q4_K_M | 117.92 | 5.27 | 5.24 | 354.6 | 199.6 | 85.1 | 0.06 | 40.72 |
 
 ## run-20261003-1729 — rocm
 
-| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
 |---|---|---|---|---|---|---|---|---|---|
 | poro2-70b-q4_k_m | Q4_K_M | 131.16 | 5.15 | 5.1 | 210.1 | 200.3 | 85.2 | 0.06 | 41.02 |
+
+## run-20261022-2042 — vulkan
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | 791.03 | 23.57 | 23.28 | 100.5 | 48.8 | 84.7 | 0.27 | 10.67 |
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | 735.34 | 55.3 | 53.9 | 108.1 | 116.6 | 85.6 | 0.63 | 59.7 |
+| poro2-70b-q4_k_m | Q4_K_M | 81.05 | 5.25 | 5.25 | 226.1 | 200.0 | 85.2 | 0.06 | 42.52 |
+| poro2-8b-q8_0 | Q8_0 | 918.43 | 27.16 | 26.84 | 46.9 | 41.6 | 84.8 | 0.32 | 9.26 |
+| qwen3-32b-q5_k_m | Q5_K_M | 243.05 | 9.71 | 9.67 | 159.5 | 186.2 | 85.0 | 0.11 | 24.01 |
+| qwen3-4b-q8_0 | Q8_0 | 1857.91 | 48.89 | 47.9 | 45.4 | 27.3 | 84.0 | 0.57 | 5.77 |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | 1109.95 | 74.86 | 72.52 | 33.7 | 40.7 | 80.4 | 0.9 | 24.39 |
+| qwen3.5-35b-a3b-q6_k | Q6_K | 1062.38 | 62.3 | 60.93 | 61.1 | 47.4 | 76.1 | 0.8 | 27.63 |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | 290.34 | 10.56 | 10.51 | 328.9 | 421.8 | 85.0 | 0.12 | 20.09 |
+| qwen3.8-27b-q6_k | Q6_K | 273.7 | 9.98 | 9.92 | 1085.1 | 834.9 | 84.1 | 0.12 | 21.13 |
+
+## run-20261022-2124 — rocm
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | 1060.1 | 22.91 | 22.92 | 54.3 | 45.9 | 84.9 | 0.27 | 10.3 |
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | 882.6 | 50.91 | 50.31 | 73.0 | 74.4 | 86.0 | 0.59 | 59.31 |
+| poro2-70b-q4_k_m | Q4_K_M | 127.06 | 5.18 | 5.18 | 219.3 | 198.3 | 85.2 | 0.06 | 42.15 |
+| poro2-8b-q8_0 | Q8_0 | 1239.11 | 26.59 | 26.39 | 42.5 | 41.2 | 84.9 | 0.31 | 8.89 |
+| qwen3-32b-q5_k_m | Q5_K_M | 292.88 | 9.54 | 9.52 | 128.1 | 109.9 | 85.4 | 0.11 | 23.68 |
+| qwen3-4b-q8_0 | Q8_0 | 2329.53 | 46.83 | 46.23 | 26.9 | 25.3 | 85.4 | 0.54 | 5.53 |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | 1246.92 | 61.41 | 59.92 | 30.0 | 21.0 | 87.0 | 0.69 | 24.37 |
+| qwen3.5-35b-a3b-q6_k | Q6_K | 1054.68 | 51.32 | 50.54 | 64.6 | 72.8 | 85.0 | 0.59 | 27.4 |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | 308.37 | 10.37 | 10.33 | 168.2 | 137.2 | 85.4 | 0.12 | 19.59 |
+| qwen3.8-27b-q6_k | Q6_K | 308.6 | 9.83 | 9.82 | 174.5 | 152.6 | 85.3 | 0.12 | 20.53 |

@@ -20,15 +20,16 @@ than trusted.
 - **10 cells × 2 backends.** Three MoE models (3–120B total, ~3B active for the
   mid-size ones) and seven dense models from 4B to 70B, all in GGUF.
 - **A 120B-class model on a 128 GB APU.** gpt-oss-120b (native MXFP4, ~59 GiB)
-  runs at **55.1 tok/s** generation (llama-bench) and 53.2 tok/s sustained
-  streaming, at 0.62 tok/s per watt.
-- **Vulkan wins generation, ROCm wins prompt processing — unanimously.**
-  **Vulkan wins generation in 10 of 10 (ROCm trails by 1.7–15.5%) and ROCm wins
-  prefill in 10 of 10 (by 2.0–24.5%).**
+  runs at **55.3 tok/s** generation (llama-bench) and 53.9 tok/s sustained
+  streaming, at 0.63 tok/s per watt, with 59.7 GiB resident.
+- **Vulkan leads generation, ROCm leads prompt processing.** **Vulkan leads
+  generation on 10 of 10 cells — decisively on 6, by 2.1–18.0%; ROCm leads
+  prefill on 9 of 10, by 6.2–56.8%.** The other five cells are inside the ±2%
+  noise floor of three repeats and read as ties.
 - **MoE models are 5–8× faster than dense models of similar footprint** at
   generation, and 5–8× more efficient per watt.
 - **Dense models sit at 73–85% of the memory-bandwidth ceiling** (256 GB/s ÷
-  model size in GiB), including the 39.6 GiB Poro 2 70B at 82% on Vulkan.
+  model size in GiB), including the 39.6 GiB Poro 2 70B at 81% on Vulkan.
 - **Finnish capability:** Poro 2 70B leads the FIN-bench-v2 `cf` axis at 0.629
   mean accuracy; at matched Q4_K_M, Poro 2 8B beats the English-centric
   Qwen3-8B by 10 points (0.530 vs 0.430).
@@ -61,7 +62,8 @@ Each cell is one model at one quantization, on each backend, with `-ngl 99`
 - **Prompt processing** — `llama-bench` `pp512` and `pp2048`.
 - **Time to first token** — three streaming requests; mean and median are both
   recorded, and the median is the one to quote (see [Limitations](#limitations)).
-- **Memory** — peak iGPU VRAM and system availability, sampled at 5 Hz.
+- **Memory** — peak resident GPU memory (VRAM + GTT; the weights live in GTT on
+  this box) and system availability, sampled at 5 Hz.
 - **Power and efficiency** — GPU power during the bench and server phases, and
   tokens per watt.
 - **Reproducibility metadata** — the pinned llama.cpp commit, the driver commit,
@@ -78,12 +80,16 @@ The reference machine — every number in this repository was measured on it:
 | iGPU | Radeon 8060S (RDNA 3.5, 40 CUs), `gfx1151` |
 | Memory | 128 GB unified LPDDR5X-8000 (~256 GB/s) |
 | Storage | 2 TB NVMe |
-| OS | CachyOS (Arch-based), kernel 7.2.8 at measurement time |
+| OS | CachyOS (Arch-based), kernel 7.2.10 at measurement time |
 
-Unified memory lets the iGPU take most of the 128 GB — a 96 GiB iGPU allocation
-was verified (`mem_info_vram_total` = 103,079,215,104 B), leaving ~30 GiB for
-the system. The 50 TOPS XDNA 2 NPU is not a practical LLM path today and is not
-benchmarked.
+Unified memory lets the iGPU address the bulk of the 128 GB. The 2026-10-22
+runs — the ones behind every table here — were measured with a **1 GiB VRAM
+carve-out** (`mem_info_vram_total` = 1,073,741,824 B) and a **104 GiB GTT pool**
+(`mem_info_gtt_total`), so model weights are resident in GTT and the rollup
+publishes VRAM + GTT as peak memory. The 2026-10-02/03 runs predate that
+configuration (96 GiB carve-out, `mem_info_vram_total` = 103,079,215,104 B,
+~30 GiB left to the system) and are kept as their own rows in the rollup. The
+50 TOPS XDNA 2 NPU is not a practical LLM path today and is not benchmarked.
 
 Machine fingerprint — driver and library versions, power source, kernel —
 is in [docs/env.md](docs/env.md).
@@ -93,7 +99,7 @@ is in [docs/env.md](docs/env.md).
 | Piece | Version |
 |---|---|
 | llama.cpp | pinned at `5b59b83f4` for all runs |
-| Backend A — Vulkan | Mesa 26.2.3 RADV (`STRIX_HALO`), `-ngl 99`, 16 threads |
+| Backend A — Vulkan | Mesa 26.2.4 RADV (`STRIX_HALO`), `-ngl 99`, 16 threads |
 | Backend B — ROCm | ROCm 7.2.4 (HIP, ROCm-WMMA flash-attention); `gfx1151` detected natively |
 | Driver | `scripts/run_sweep.py` — Python 3, stdlib + PyYAML |
 
@@ -127,56 +133,65 @@ size; `server tg` is the sustained 512-token stream from `llama-server`, and
 power, temperature, per-request TTFT, benchmark context — is in
 [results/table.md](results/table.md).
 
-| Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | VRAM GiB |
+| Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | peak GPU GiB |
 |---|---|---|---|---|---|---|---|
-| `qwen3-4b-q8_0` | vulkan | 2056.8 | 49.10 | 47.69 | 27.7 | 0.57 | 4.81 |
-| `qwen3-4b-q8_0` | rocm | 2392.5 | 46.83 | 44.97 | 24.4 | 0.53 | 5.06 |
-| `poro2-8b-q8_0` | vulkan | 1025.8 | 27.13 | 26.61 | 234.3 | 0.31 | 8.21 |
-| `poro2-8b-q8_0` | rocm | 1277.2 | 26.65 | 26.16 | 41.9 | 0.31 | 8.47 |
-| `eurollm-9b-q8_0` | vulkan | 911.4 | 23.54 | 23.06 | 48.7 | 0.27 | 9.48 |
-| `eurollm-9b-q8_0` | rocm | 1089.1 | 23.02 | 22.57 | 47.2 | 0.26 | 9.74 |
-| `qwen3.8-27b-q5_k_xl` | vulkan | 328.6 | 10.60 | 10.52 | 1631.9 | 0.13 | 19.06 |
-| `qwen3.8-27b-q5_k_xl` | rocm | 339.2 | 10.35 | 10.23 | 137.3 | 0.12 | 19.65 |
-| `qwen3.8-27b-q6_k` | vulkan | 317.7 | 10.01 | 9.96 | 809.1 | 0.12 | 20.09 |
-| `qwen3.8-27b-q6_k` | rocm | 336.3 | 9.84 | 9.73 | 150.0 | 0.11 | 20.59 |
-| `qwen3-32b-q5_k_m` | vulkan | 264.5 | 9.71 | 9.64 | 471.9 | 0.11 | 22.52 |
-| `qwen3-32b-q5_k_m` | rocm | 306.9 | 9.47 | 9.31 | 113.2 | 0.11 | 22.79 |
-| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1140.1 | 74.75 | 71.46 | 162.8 | 0.89 | 23.76 |
-| `qwen3-coder-30b-a3b-q6_k` | rocm | 1288.4 | 63.20 | 58.59 | 22.5 | 0.68 | 24.12 |
-| `qwen3.5-35b-a3b-q6_k` | vulkan | 1118.0 | 61.77 | 60.26 | 688.5 | 0.80 | 27.10 |
-| `qwen3.5-35b-a3b-q6_k` | rocm | 1140.1 | 52.82 | 50.80 | 58.1 | 0.59 | 27.46 |
-| `poro2-70b-q4_k_m` | vulkan | 117.9 | 5.27 | 5.24 | 199.6 | 0.06 | 40.72 |
-| `poro2-70b-q4_k_m` | rocm | 131.2 | 5.15 | 5.10 | 200.3 | 0.06 | 41.02 |
-| `gpt-oss-120b-mxfp4` | vulkan | 780.4 | 55.12 | 53.18 | 143.9 | 0.62 | 59.09 |
-| `gpt-oss-120b-mxfp4` | rocm | 906.9 | 51.46 | 49.59 | 67.2 | 0.58 | 59.36 |
+| `qwen3-4b-q8_0` | vulkan | 1857.9 | 48.89 | 47.90 | 27.3 | 0.57 | 5.77 |
+| `qwen3-4b-q8_0` | rocm | 2329.5 | 46.83 | 46.23 | 25.3 | 0.54 | 5.53 |
+| `poro2-8b-q8_0` | vulkan | 918.4 | 27.16 | 26.84 | 41.6 | 0.32 | 9.26 |
+| `poro2-8b-q8_0` | rocm | 1239.1 | 26.59 | 26.39 | 41.2 | 0.31 | 8.89 |
+| `eurollm-9b-q8_0` | vulkan | 791.0 | 23.57 | 23.28 | 48.8 | 0.27 | 10.67 |
+| `eurollm-9b-q8_0` | rocm | 1060.1 | 22.91 | 22.92 | 45.9 | 0.27 | 10.30 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 290.3 | 10.56 | 10.51 | 421.8 | 0.12 | 20.09 |
+| `qwen3.8-27b-q5_k_xl` | rocm | 308.4 | 10.37 | 10.33 | 137.2 | 0.12 | 19.59 |
+| `qwen3.8-27b-q6_k` | vulkan | 273.7 | 9.98 | 9.92 | 834.9 | 0.12 | 21.13 |
+| `qwen3.8-27b-q6_k` | rocm | 308.6 | 9.83 | 9.82 | 152.6 | 0.12 | 20.53 |
+| `qwen3-32b-q5_k_m` | vulkan | 243.1 | 9.71 | 9.67 | 186.2 | 0.11 | 24.01 |
+| `qwen3-32b-q5_k_m` | rocm | 292.9 | 9.54 | 9.52 | 109.9 | 0.11 | 23.68 |
+| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1110.0 | 74.86 | 72.52 | 40.7 | 0.90 | 24.39 |
+| `qwen3-coder-30b-a3b-q6_k` | rocm | 1246.9 | 61.41 | 59.92 | 21.0 | 0.69 | 24.37 |
+| `qwen3.5-35b-a3b-q6_k` | vulkan | 1062.4 | 62.30 | 60.93 | 47.4 | 0.80 | 27.63 |
+| `qwen3.5-35b-a3b-q6_k` | rocm | 1054.7 | 51.32 | 50.54 | 72.8 | 0.59 | 27.40 |
+| `poro2-70b-q4_k_m` | vulkan | 81.0 | 5.25 | 5.25 | 200.0 | 0.06 | 42.52 |
+| `poro2-70b-q4_k_m` | rocm | 127.1 | 5.18 | 5.18 | 198.3 | 0.06 | 42.15 |
+| `gpt-oss-120b-mxfp4` | vulkan | 735.3 | 55.30 | 53.90 | 116.6 | 0.63 | 59.70 |
+| `gpt-oss-120b-mxfp4` | rocm | 882.6 | 50.91 | 50.31 | 74.4 | 0.59 | 59.31 |
 
-**Vulkan wins generation in 10 of 10 (ROCm trails by 1.7–15.5%) and ROCm wins
-prefill in 10 of 10 (by 2.0–24.5%).** The 2026-10-03 round of five additional
-cells reproduces the split pairwise: Vulkan is faster on `tg512` in 5 of 5
-(ROCm trails by 1.8–4.6%), and ROCm is faster on `pp2048` in 5 of 5 (by
-11.2–24.5%) — the direction held from a 4B cell to a 39.6 GiB 70B.
+**Vulkan leads `tg512` on 10 of 10 cells — decisively on 6 (by 2.1–18.0%), with
+4 ties — and ROCm leads `pp2048` on 9 of 10 (by 6.2–56.8%), with 1 tie.**
+A cell counts as a tie when the gap is under 2%, the noise floor of three repeats
+([Limitations](#limitations)); the direction is one-sided, no cell reverses. The
+2026-10-03 round of five additional cells reproduces the split: Vulkan leads
+`tg512` on all five (decisively on 3, by 2.1–4.2%) and ROCm leads `pp2048` on all
+five (by 20.5–56.8%) — the direction held from a 4B cell to a 39.6 GiB 70B.
 
 Three things worth knowing before quoting these numbers:
 
 - **The gaps are small on dense models and large on MoE.** ROCm's generation
-  shortfall is 1.7–4.6% on the seven dense cells, but 15.5% on
-  Qwen3-Coder-30B-A3B and 14.5% on Qwen3.5-35B-A3B. Prefill goes the other
-  way: ROCm's advantage is narrowest on Qwen3.5-35B-A3B (2.0%) and widest on
-  Poro 2 8B (24.5%).
+  shortfall is 1.3–4.2% on the seven dense cells, but 7.9% on gpt-oss-120b,
+  17.6% on Qwen3.5-35B-A3B and 18.0% on Qwen3-Coder-30B-A3B. Prefill goes the
+  other way: ROCm's advantage runs from 6.2% on Qwen3.8-27B (Q5_K_XL) to 56.8%
+  on Poro 2 70B, with Qwen3.5-35B-A3B the one tie (0.7%).
 - **MoE cells are 5–8× faster at generation and 5–8× more efficient per watt**
-  than the dense 27–32B cells: 74.75 tok/s at 0.89 tok/s/W
-  (Qwen3-Coder-30B-A3B) and 61.77 at 0.80 (Qwen3.5-35B-A3B), against 9.5–10.6
-  tok/s at 0.11–0.13 for the dense cells. A few billion active parameters do
+  than the dense 27–32B cells: 74.86 tok/s at 0.90 tok/s/W
+  (Qwen3-Coder-30B-A3B) and 62.30 at 0.80 (Qwen3.5-35B-A3B), against 9.5–10.6
+  tok/s at 0.11–0.12 for the dense cells. A few billion active parameters do
   most of the work.
 - **Dense cells run at 73–85% of the bandwidth ceiling** (256 GB/s ÷ model size
-  in GiB). The 39.6 GiB Poro 2 70B reaches 5.27 tok/s against a 6.46 tok/s
-  ceiling — 82% on Vulkan, 80% on ROCm — and the 4B cell reaches 77% on Vulkan.
+  in GiB). The 39.6 GiB Poro 2 70B reaches 5.25 tok/s against a 6.46 tok/s
+  ceiling — 81% on Vulkan, 80% on ROCm — and the 4B cell reaches 76% on Vulkan.
   The MoE cells clear the ceiling outright, which is the point of the
   architecture.
 
-ROCm runs hotter throughout: 83–91 °C across the ten cells against 69–85 °C on
-Vulkan, with the Qwen3-4B cell the hottest measured at 91 °C. Temperature is
+ROCm runs hotter throughout: 88–95 °C across the ten cells against 74–92 °C on
+Vulkan, with the Qwen3-4B cell the hottest measured at 95 °C. Temperature is
 logged per run.
+
+> **The peak GPU column is residency, not the VRAM pool.** On this box the UMA
+> carve-out is 1 GiB, so weights live in GTT while `mem_info_vram_used` sits near
+> the idle floor: the rollup sums VRAM + GTT into `mem_peak_gib` and the table
+> publishes that. Rows from runs that predate GTT sampling show the VRAM pool
+> only, which is why the older tables' 59 GiB cell read as 0.87 GiB. See
+> [docs/RUNNING.md](docs/RUNNING.md) §7.
 
 > **The TTFT column is not a like-for-like latency figure — read
 > [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it.** On Vulkan, a request that
@@ -366,7 +381,7 @@ What is pinned, and where:
 ## Limitations
 
 - **One machine, one stack.** Every number comes from a single Ryzen AI Max+ 395
-  board on CachyOS with Mesa 26.2.3 and ROCm 7.2.4. Another board, driver or
+  board on CachyOS with Mesa 26.2.4 and ROCm 7.2.4. Another board, driver or
   kernel can move them, especially the Vulkan/ROCm split.
 - **GPU power only.** Power is read from the amdgpu hwmon, not the whole SoC, so
   tokens-per-watt understates the energy cost of prompt processing.
@@ -379,10 +394,13 @@ What is pinned, and where:
   fall to ~0.14 s and ~0.28 s. The 32B cell shows no q8-vs-f16 difference, so the
   column is not comparable across cells or backends, and for the 27B cell it is
   dominated by cache work rather than latency.
-- **Numbers are stack-stamped.** The tracked tables were measured on kernel 7.2.8 /
-  Mesa 26.2.3; this machine now runs 7.2.10 / 26.2.4, where re-checked cells are
-  8–11% lower on `pp2048` while `tg512` is unchanged. Re-measure before mixing new
-  runs into the published tables.
+- **Numbers are stack-stamped, and the tables were re-measured.** Everything in
+  the table above comes from the 2026-10-22 sweeps on kernel 7.2.10 / Mesa
+  26.2.4 / ROCm 7.2.4. The earlier 2026-10-02/03 rows (kernel 7.2.8 / Mesa
+  26.2.3) stay in the rollup under their own run ids; measured against them over
+  all 20 cell/backend pairs, `pp2048` is 2.6–31.3% lower on the current stack and
+  `tg512` stays inside −2.8…+0.9%. Never mix rows from two stacks in one
+  comparison.
 - **No error bars.** Three repeats catch a broken run; they do not support a 1%
   claim. Differences under ~2% are within noise for this setup.
 - **FIN-bench is one formulation.** `cf` at prompt variant `p0` only. `mcf` and

@@ -230,3 +230,243 @@ run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_bench,W,8
 run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,temp_c_max,C,89.0,
 run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,vram_peak_gib,GiB,41.02,
 run-20261003-1729,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tok_per_w,t/s/W,0.06,server tg / probe W mean
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,pp512_bench_tps,t/s,898.89,"llama-bench mean of 3, sd ±6.58"
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,pp2048_bench_tps,t/s,791.03,"llama-bench mean of 3, sd ±22.51"
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tg512_bench_tps,t/s,23.57,"llama-bench mean of 3, sd ±0.02"
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tg_server_tps,t/s,23.28,"streaming, mean of 3"
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,ttft_ms,ms,100.5,mean of 3
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,ttft_ms_p50,ms,48.8,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,power_w_probe,W,84.7,max 92.2
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,power_w_bench,W,81.7,max 105.4
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,temp_c_max,C,89.0,
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,vram_peak_gib,GiB,0.74,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,mem_peak_gib,GiB,10.67,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tok_per_w,t/s/W,0.27,server tg / probe W mean
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp512_bench_tps,t/s,780.55,"llama-bench mean of 3, sd ±1.79"
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp2048_bench_tps,t/s,735.34,"llama-bench mean of 3, sd ±27.28"
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg512_bench_tps,t/s,55.3,"llama-bench mean of 3, sd ±0.21"
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg_server_tps,t/s,53.9,"streaming, mean of 3"
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms,ms,108.1,mean of 3
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms_p50,ms,116.6,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_probe,W,85.6,max 91.0
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_bench,W,64.7,max 115.3
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,temp_c_max,C,74.0,
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,vram_peak_gib,GiB,0.87,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,mem_peak_gib,GiB,59.7,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tok_per_w,t/s/W,0.63,server tg / probe W mean
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp512_bench_tps,t/s,84.46,"llama-bench mean of 3, sd ±0.1"
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp2048_bench_tps,t/s,81.05,"llama-bench mean of 3, sd ±0.07"
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg512_bench_tps,t/s,5.25,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg_server_tps,t/s,5.25,"streaming, mean of 3"
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms,ms,226.1,mean of 3
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms_p50,ms,200.0,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_probe,W,85.2,max 95.5
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_bench,W,82.3,max 109.1
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,temp_c_max,C,87.0,
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,vram_peak_gib,GiB,0.99,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,mem_peak_gib,GiB,42.52,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tok_per_w,t/s/W,0.06,server tg / probe W mean
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,pp512_bench_tps,t/s,1044.86,"llama-bench mean of 3, sd ±7.33"
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,pp2048_bench_tps,t/s,918.43,"llama-bench mean of 3, sd ±23.74"
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tg512_bench_tps,t/s,27.16,"llama-bench mean of 3, sd ±0.04"
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tg_server_tps,t/s,26.84,"streaming, mean of 3"
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,ttft_ms,ms,46.9,mean of 3
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,ttft_ms_p50,ms,41.6,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,power_w_probe,W,84.8,max 91.7
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,power_w_bench,W,84.3,max 106.3
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,temp_c_max,C,90.0,
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,vram_peak_gib,GiB,0.86,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,mem_peak_gib,GiB,9.26,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tok_per_w,t/s/W,0.32,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,pp512_bench_tps,t/s,287.23,"llama-bench mean of 3, sd ±19.85"
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,pp2048_bench_tps,t/s,243.05,"llama-bench mean of 3, sd ±0.07"
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tg512_bench_tps,t/s,9.71,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tg_server_tps,t/s,9.67,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,ttft_ms,ms,159.5,mean of 3
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,ttft_ms_p50,ms,186.2,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,power_w_probe,W,85.0,max 91.5
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,power_w_bench,W,81.9,max 118.4
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,temp_c_max,C,89.0,
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,vram_peak_gib,GiB,0.97,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,mem_peak_gib,GiB,24.01,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tok_per_w,t/s/W,0.11,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,pp512_bench_tps,t/s,2199.47,"llama-bench mean of 3, sd ±8.3"
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,pp2048_bench_tps,t/s,1857.91,"llama-bench mean of 3, sd ±27.0"
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tg512_bench_tps,t/s,48.89,"llama-bench mean of 3, sd ±0.1"
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tg_server_tps,t/s,47.9,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,ttft_ms,ms,45.4,mean of 3
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,ttft_ms_p50,ms,27.3,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,power_w_probe,W,84.0,max 90.6
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,power_w_bench,W,84.5,max 111.4
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,temp_c_max,C,92.0,
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,vram_peak_gib,GiB,0.73,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,mem_peak_gib,GiB,5.77,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tok_per_w,t/s/W,0.57,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp512_bench_tps,t/s,1209.12,"llama-bench mean of 3, sd ±6.22"
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp2048_bench_tps,t/s,1109.95,"llama-bench mean of 3, sd ±47.88"
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg512_bench_tps,t/s,74.86,"llama-bench mean of 3, sd ±0.02"
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg_server_tps,t/s,72.52,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms,ms,33.7,mean of 3
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms_p50,ms,40.7,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_probe,W,80.4,max 87.1
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_bench,W,67.9,max 117.9
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,temp_c_max,C,79.0,
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,vram_peak_gib,GiB,0.94,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,mem_peak_gib,GiB,24.39,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tok_per_w,t/s/W,0.9,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp512_bench_tps,t/s,1108.03,"llama-bench mean of 3, sd ±3.94"
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp2048_bench_tps,t/s,1062.38,"llama-bench mean of 3, sd ±31.35"
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg512_bench_tps,t/s,62.3,"llama-bench mean of 3, sd ±0.01"
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg_server_tps,t/s,60.93,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms,ms,61.1,mean of 3
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms_p50,ms,47.4,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_probe,W,76.1,max 80.5
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_bench,W,64.1,max 113.7
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,temp_c_max,C,76.0,
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,vram_peak_gib,GiB,0.99,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,mem_peak_gib,GiB,27.63,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tok_per_w,t/s/W,0.8,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp512_bench_tps,t/s,316.32,"llama-bench mean of 3, sd ±15.77"
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp2048_bench_tps,t/s,290.34,"llama-bench mean of 3, sd ±0.29"
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.56,"llama-bench mean of 3, sd ±0.01"
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.51,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,328.9,mean of 3
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms_p50,ms,421.8,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,85.0,max 93.2
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,81.6,max 118.2
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,83.0,
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,0.91,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,mem_peak_gib,GiB,20.09,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp512_bench_tps,t/s,292.11,"llama-bench mean of 3, sd ±14.31"
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp2048_bench_tps,t/s,273.7,"llama-bench mean of 3, sd ±0.39"
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg512_bench_tps,t/s,9.98,"llama-bench mean of 3, sd ±0.01"
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg_server_tps,t/s,9.92,"streaming, mean of 3"
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms,ms,1085.1,mean of 3
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms_p50,ms,834.9,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_probe,W,84.1,max 94.0
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_bench,W,83.0,max 117.9
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,temp_c_max,C,88.0,
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,vram_peak_gib,GiB,0.9,VRAM pool only; residency = mem_peak_gib
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,mem_peak_gib,GiB,21.13,peak resident GPU memory (VRAM + GTT)
+run-20261022-2042,vulkan,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,pp512_bench_tps,t/s,1132.43,"llama-bench mean of 3, sd ±31.92"
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,pp2048_bench_tps,t/s,1060.1,"llama-bench mean of 3, sd ±22.47"
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tg512_bench_tps,t/s,22.91,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tg_server_tps,t/s,22.92,"streaming, mean of 3"
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,ttft_ms,ms,54.3,mean of 3
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,ttft_ms_p50,ms,45.9,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,power_w_probe,W,84.9,max 96.4
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,power_w_bench,W,82.3,max 115.9
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,temp_c_max,C,94.0,
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,mem_peak_gib,GiB,10.3,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,eurollm-9b-q8_0,EuroLLM-9B-Instruct,Q8_0,9.1,tok_per_w,t/s/W,0.27,server tg / probe W mean
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp512_bench_tps,t/s,917.24,"llama-bench mean of 3, sd ±22.86"
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,pp2048_bench_tps,t/s,882.6,"llama-bench mean of 3, sd ±28.34"
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg512_bench_tps,t/s,50.91,"llama-bench mean of 3, sd ±0.02"
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tg_server_tps,t/s,50.31,"streaming, mean of 3"
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms,ms,73.0,mean of 3
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,ttft_ms_p50,ms,74.4,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_probe,W,86.0,max 94.0
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,power_w_bench,W,66.6,max 117.8
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,temp_c_max,C,89.0,
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,mem_peak_gib,GiB,59.31,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,gpt-oss-120b-mxfp4,gpt-oss-120b,MXFP4 (native),59.0,tok_per_w,t/s/W,0.59,server tg / probe W mean
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp512_bench_tps,t/s,128.83,"llama-bench mean of 3, sd ±1.19"
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,pp2048_bench_tps,t/s,127.06,"llama-bench mean of 3, sd ±0.14"
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg512_bench_tps,t/s,5.18,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tg_server_tps,t/s,5.18,"streaming, mean of 3"
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms,ms,219.3,mean of 3
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,ttft_ms_p50,ms,198.3,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_probe,W,85.2,max 116.0
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,power_w_bench,W,82.4,max 115.5
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,temp_c_max,C,93.0,
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,vram_peak_gib,GiB,0.15,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,mem_peak_gib,GiB,42.15,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,poro2-70b-q4_k_m,Poro 2 70B,Q4_K_M,39.6,tok_per_w,t/s/W,0.06,server tg / probe W mean
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,pp512_bench_tps,t/s,1339.51,"llama-bench mean of 3, sd ±16.87"
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,pp2048_bench_tps,t/s,1239.11,"llama-bench mean of 3, sd ±31.86"
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tg512_bench_tps,t/s,26.59,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tg_server_tps,t/s,26.39,"streaming, mean of 3"
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,ttft_ms,ms,42.5,mean of 3
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,ttft_ms_p50,ms,41.2,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,power_w_probe,W,84.9,max 100.6
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,power_w_bench,W,84.4,max 116.0
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,temp_c_max,C,94.0,
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,mem_peak_gib,GiB,8.89,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,poro2-8b-q8_0,Poro 2 8B,Q8_0,8.0,tok_per_w,t/s/W,0.31,server tg / probe W mean
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,pp512_bench_tps,t/s,312.73,"llama-bench mean of 3, sd ±8.95"
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,pp2048_bench_tps,t/s,292.88,"llama-bench mean of 3, sd ±0.67"
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tg512_bench_tps,t/s,9.54,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tg_server_tps,t/s,9.52,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,ttft_ms,ms,128.1,mean of 3
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,ttft_ms_p50,ms,109.9,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,power_w_probe,W,85.4,max 116.5
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,power_w_bench,W,82.2,max 118.4
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,temp_c_max,C,93.0,
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,mem_peak_gib,GiB,23.68,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3-32b-q5_k_m,Qwen3-32B,Q5_K_M,21.6,tok_per_w,t/s/W,0.11,server tg / probe W mean
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,pp512_bench_tps,t/s,2431.2,"llama-bench mean of 3, sd ±72.03"
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,pp2048_bench_tps,t/s,2329.53,"llama-bench mean of 3, sd ±27.09"
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tg512_bench_tps,t/s,46.83,"llama-bench mean of 3, sd ±0.02"
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tg_server_tps,t/s,46.23,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,ttft_ms,ms,26.9,mean of 3
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,ttft_ms_p50,ms,25.3,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,power_w_probe,W,85.4,max 103.4
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,power_w_bench,W,84.8,max 117.3
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,temp_c_max,C,95.0,
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,mem_peak_gib,GiB,5.53,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3-4b-q8_0,Qwen3-4B,Q8_0,4.0,tok_per_w,t/s/W,0.54,server tg / probe W mean
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp512_bench_tps,t/s,1302.97,"llama-bench mean of 3, sd ±25.58"
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,pp2048_bench_tps,t/s,1246.92,"llama-bench mean of 3, sd ±32.38"
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg512_bench_tps,t/s,61.41,"llama-bench mean of 3, sd ±0.29"
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tg_server_tps,t/s,59.92,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms,ms,30.0,mean of 3
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,ttft_ms_p50,ms,21.0,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_probe,W,87.0,max 106.2
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,power_w_bench,W,71.6,max 117.0
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,temp_c_max,C,88.0,
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,mem_peak_gib,GiB,24.37,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3-coder-30b-a3b-q6_k,qwen3-coder-30b-a3b-instruct,Q6_K,23.4,tok_per_w,t/s/W,0.69,server tg / probe W mean
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp512_bench_tps,t/s,1078.57,"llama-bench mean of 3, sd ±31.0"
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,pp2048_bench_tps,t/s,1054.68,"llama-bench mean of 3, sd ±16.2"
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg512_bench_tps,t/s,51.32,"llama-bench mean of 3, sd ±0.04"
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tg_server_tps,t/s,50.54,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms,ms,64.6,mean of 3
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,ttft_ms_p50,ms,72.8,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_probe,W,85.0,max 93.3
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,power_w_bench,W,71.1,max 113.0
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,temp_c_max,C,88.0,
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,vram_peak_gib,GiB,0.14,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,mem_peak_gib,GiB,27.4,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3.5-35b-a3b-q6_k,Qwen3.5-35B-A3B,Q6_K,26.9,tok_per_w,t/s/W,0.59,server tg / probe W mean
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp512_bench_tps,t/s,316.45,"llama-bench mean of 3, sd ±7.65"
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,pp2048_bench_tps,t/s,308.37,"llama-bench mean of 3, sd ±1.22"
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg512_bench_tps,t/s,10.37,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tg_server_tps,t/s,10.33,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms,ms,168.2,mean of 3
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,ttft_ms_p50,ms,137.2,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_probe,W,85.4,max 113.3
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,power_w_bench,W,82.3,max 117.3
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,temp_c_max,C,90.0,
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,vram_peak_gib,GiB,0.15,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,mem_peak_gib,GiB,19.59,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3.8-27b-q5_k_xl,Qwen3.8-27B (Unsloth dynamic),Q5_K_XL,19.4,tok_per_w,t/s/W,0.12,server tg / probe W mean
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp512_bench_tps,t/s,315.17,"llama-bench mean of 3, sd ±5.67"
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,pp2048_bench_tps,t/s,308.6,"llama-bench mean of 3, sd ±1.35"
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg512_bench_tps,t/s,9.83,"llama-bench mean of 3, sd ±0.0"
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tg_server_tps,t/s,9.82,"streaming, mean of 3"
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms,ms,174.5,mean of 3
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,ttft_ms_p50,ms,152.6,median of 3; compare with ttft_ms to gauge request-to-request spread
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_probe,W,85.3,max 109.0
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,power_w_bench,W,83.4,max 117.8
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,temp_c_max,C,93.0,
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,vram_peak_gib,GiB,0.15,VRAM pool only; residency = mem_peak_gib
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,mem_peak_gib,GiB,20.53,peak resident GPU memory (VRAM + GTT)
+run-20261022-2124,rocm,qwen3.8-27b-q6_k,Qwen3.8-27B (Unsloth dynamic),Q6_K,20.5,tok_per_w,t/s/W,0.12,server tg / probe W mean

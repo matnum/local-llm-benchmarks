@@ -1,29 +1,39 @@
 # Environment fingerprint
 
-Verified 2026-09-30 on the reference machine (the hardware under test).
+Verified 2026-09-30 on the reference machine (the hardware under test); the OS,
+Vulkan and GPU-memory rows were re-verified 2026-10-23 against the live box.
 
-> **This is the measurement-time snapshot, not the current machine.** As of 2026-10-22 the
-> same box runs kernel 7.2.10-1 and Mesa 26.2.4 (RADV `STRIX_HALO`). Every tracked result
-> was measured on the versions below; re-checked cells on the newer stack are 8–11% lower on
-> `pp2048` with `tg512` unchanged (see [RUNNING.md §7](RUNNING.md)). Do not compare a new
-> run against these tables without re-measuring the rest.
+> **This is the measurement-time snapshot of the current runs.** The published tables were
+> re-measured on **2026-10-22** on kernel `7.2.10-1-cachyos` / Mesa `26.2.4-arch3.1` /
+> ROCm 7.2.4, all ten cells on both backends. Against the 2026-10-02/03 rows (kernel 7.2.8
+> / Mesa 26.2.3, still in the rollup under their own run ids) `pp2048` landed **2.6–31.3%
+> lower** and `tg512` inside **−2.8…+0.9%** across all 20 cell/backend pairs. The earlier
+> "8–11%" figure came from a two-cell pilot and understated the full grid (see
+> [RUNNING.md §7](RUNNING.md)).
+>
+> **The GPU memory split changed on 2026-10-22.** `mem_info_vram_total` now reads **1 GiB**
+> with a **104 GiB GTT pool**, so model weights are resident in **GTT**, not in the VRAM
+> pool: `mem_info_vram_used` sits at ~0.1–1 GiB during a 59 GiB model's run while
+> `MemAvailable` drops by the model's size. The sampler records both pools and the rollup
+> publishes `mem_peak_gib` (VRAM + GTT); `vram_peak_gib` alone is not residency on this
+> configuration. Runs from before the change (96 GiB carve-out) carry the VRAM pool only.
 
 | Item | Value |
 |---|---|
 | Host | reference host |
-| OS | CachyOS (Arch-based), kernel 7.2.8-1-cachyos, x86_64 |
+| OS | CachyOS (Arch-based), kernel 7.2.10-1-cachyos, x86_64 |
 | CPU | AMD Ryzen AI Max+ 395 (Strix Halo), 16C/32T, boost to 5.19 GHz |
 | iGPU | Radeon 8060S (RDNA 3.5, 40 CUs), PCI `c5:00.0` |
-| iGPU VRAM | 103,079,215,104 B (96 GiB) via `mem_info_vram_total`; ~30 GiB left to system |
+| iGPU VRAM | `mem_info_vram_total` = **1,073,741,824 B (1 GiB)** since the 2026-10-22 carve-out change; `mem_info_gtt_total` = **111,669,149,696 B (104 GiB)** carries the weights. The 96 GiB carve-out (`103,079,215,104 B`) that the 2026-10-02/03 runs measured with is gone. |
 | NPU | aie2p (XDNA 2) visible in rocminfo — **not used**, per README |
 | Storage | `/dev/nvme0n1p1` 1.9 TB, ~1.6 TB free at fingerprint time |
-| Vulkan | Mesa 26.2.3-arch3.1, RADV `STRIX_HALO`, ICD `radeon_icd.json` |
+| Vulkan | Mesa 26.2.4-arch3.1, RADV `STRIX_HALO`, ICD `radeon_icd.json` |
 | ROCm | 7.2.4 at `/opt/rocm`; `rocminfo` sees **gfx1151 natively** (no `HSA_OVERRIDE_GFX_VERSION` needed) |
 | llama.cpp | `~/.local/opt/llama.cpp` @ commit **5b59b83f4** (pinned, decision D2) |
 |  · Backend A | `build-vulkan/` — `GGML_VULKAN=ON`, Release (reference) |
 |  · Backend B | `build/` — `GGML_HIP=ON`, Release, `ROCWMMA_FATTN=ON`, `GRAPHS=ON`, `NO_VMM=ON` |
 |  · (ref) | `build-probe/` — earlier HIP probe build |
-| Models | `~/.local/share/models/` — 5 files, ~152 GB (see `matrix.yaml`) |
+| Models | `~/.local/share/models/` — 11 GGUF files, ~247 GB (cells in `matrix.yaml`) |
 | Python | 3.14.7 (harness uses stdlib + CLI only; no `llama-cpp-python`) |
 | Tools | git 2.55, cmake, gcc/g++, clang, hipcc/amdclang, vulkaninfo, rocm-smi |
 

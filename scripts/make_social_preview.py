@@ -42,12 +42,30 @@ def pct(vals, cell, metric):
     return abs((v - r) / v * 100)
 
 
+def mem_peak(m):
+    """Residency (VRAM + GTT) when the run recorded GTT, else the VRAM pool."""
+    return m.get("mem_peak_gib") or m.get("vram_peak_gib", 0.0)
+
+
+# The README's noise floor for three repeats; a gap below this is a tie.
+TIE_PCT = 2.0
+
+
 def main():
     vals = load()
     cells = sorted({c for c, _ in vals})
-    tg = [pct(vals, c, "tg512_bench_tps") for c in cells]
-    pp = [pct(vals, c, "pp2048_bench_tps") for c in cells]
-    big = max(cells, key=lambda c: vals[(c, "vulkan")]["vram_peak_gib"])
+    # Range and count over the cells that backend actually wins: a cell inside the
+    # noise floor is a tie, not a member of either leading set.
+    tg_wins = [c for c in cells
+               if vals[(c, "vulkan")]["tg512_bench_tps"] > vals[(c, "rocm")]["tg512_bench_tps"]]
+    pp_wins = [c for c in cells
+               if vals[(c, "rocm")]["pp2048_bench_tps"] > vals[(c, "vulkan")]["pp2048_bench_tps"]]
+    # The range quoted on the card is over decisive wins only, the same convention
+    # the README and tests/test_readme_ranges.py use: a 1.3% "win" is a tie and
+    # must not set the floor of a headline range.
+    tg = [g for g in (pct(vals, c, "tg512_bench_tps") for c in tg_wins) if g >= TIE_PCT]
+    pp = [g for g in (pct(vals, c, "pp2048_bench_tps") for c in pp_wins) if g >= TIE_PCT]
+    big = max(cells, key=lambda c: mem_peak(vals[(c, "vulkan")]))
     big_tg = vals[(big, "vulkan")]["tg512_bench_tps"]
 
     fig = plt.figure(figsize=(12.8, 6.4), dpi=100)
@@ -68,7 +86,7 @@ def main():
     stats = [
         (f"{big_tg:.0f} tok/s", "gpt-oss-120b (59 GiB)\ngeneration, Vulkan"),
         (f"{len(cells)} × 2", "model/quant cells\n× Vulkan and ROCm"),
-        (f"{len(tg)}/10 · {len(pp)}/10", "Vulkan wins generation\nROCm wins prefill"),
+        (f"{len(tg_wins)}/{len(cells)} · {len(pp_wins)}/{len(cells)}", "Vulkan wins generation\nROCm wins prefill"),
     ]
     x = 0.06
     for value, label in stats:

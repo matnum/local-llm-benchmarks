@@ -53,7 +53,7 @@ LLAMA_CPP = os.path.expanduser("~/.local/opt/llama.cpp")
 BUILDS = {"vulkan": f"{LLAMA_CPP}/build-vulkan/bin", "rocm": f"{LLAMA_CPP}/build/bin"}
 GIB = 1024 ** 3
 IDLE_BUSY_PCT = 5
-IDLE_VRAM_GIB = 4.0
+IDLE_MEM_GIB = 4.0      # resident GPU memory budget (VRAM + GTT): see gpu_mem()
 IDLE_SETTLE_S = 90      # how long to let the GPU settle before declaring it busy
 
 
@@ -121,18 +121,32 @@ def cpu_power_state():
     }
 
 
+def gpu_mem():
+    """Resident GPU memory in GiB: (vram, gtt, total).
+
+    M-1: on a small UMA carve-out the weights live in GTT, so a foreign
+    `llama-server` shows up in `mem_info_gtt_used` while `mem_info_vram_used`
+    stays at its idle floor. A gate that reads VRAM alone would wave a loaded GPU
+    through and silently contaminate every cell of the sweep.
+    """
+    vram = rd("/sys/class/drm/card0/device/mem_info_vram_used") / GIB
+    gtt_raw = rd("/sys/class/drm/card0/device/mem_info_gtt_used")
+    gtt = 0.0 if gtt_raw is None else gtt_raw / GIB
+    return vram, gtt, vram + gtt
+
+
 def gpu_idle():
     busy = rd("/sys/class/drm/card0/device/gpu_busy_percent")
-    vram = rd("/sys/class/drm/card0/device/mem_info_vram_used") / GIB
-    return busy < IDLE_BUSY_PCT and vram < IDLE_VRAM_GIB, busy, vram
+    _vram, _gtt, total = gpu_mem()
+    return busy < IDLE_BUSY_PCT and total < IDLE_MEM_GIB, busy, total
 
 
 def wait_idle(tag, timeout=IDLE_SETTLE_S, poll_s=2.0):
-    """Poll until the GPU is idle; return (ok, busy, vram).
+    """Poll until the GPU is idle; return (ok, busy, mem_gib).
 
     A single instantaneous read is not enough. Tearing down a large model leaves
-    gpu_busy near 95% for several seconds *after* VRAM has been released — the
-    teardown is itself GPU work and the busy counter lags it. Judging on the
+    gpu_busy near 95% for several seconds *after* its memory has been released —
+    the teardown is itself GPU work and the busy counter lags it. Judging on the
     instant right after `probe_cell` kills a 59 GiB server hard-failed the next
     cell of a sweep (run-20261002-1731 died between cells 1 and 2 with
     busy=93%, vram=0.1 GiB). Waiting for a settled GPU keeps the contamination
@@ -141,15 +155,15 @@ def wait_idle(tag, timeout=IDLE_SETTLE_S, poll_s=2.0):
     """
     t0 = time.time()
     while True:
-        ok, busy, vram = gpu_idle()
+        ok, busy, mem = gpu_idle()
         if ok:
             waited = time.time() - t0
             if waited >= poll_s:
                 log(f"[{tag}] GPU settled after {waited:.1f}s "
-                    f"(busy={busy}%, vram={vram:.1f} GiB)")
-            return True, busy, vram
+                    f"(busy={busy}%, vram+gtt={mem:.1f} GiB)")
+            return True, busy, mem
         if time.time() - t0 >= timeout:
-            return False, busy, vram
+            return False, busy, mem
         time.sleep(poll_s)
 
 
@@ -270,13 +284,23 @@ def window_stats(rows, t0, t1):
     sel = [r for r in rows if t0 <= float(r["ts"]) <= t1]
     if not sel:
         return None
-    return {
+    stats = {
         "power_w_mean": round(statistics.fmean(float(r["power_w"]) for r in sel), 1),
         "power_w_max": round(max(float(r["power_w"]) for r in sel), 1),
         "temp_c_max": round(max(float(r["temp_c"]) for r in sel), 1),
         "vram_gib_max": round(max(float(r["vram_used_gib"]) for r in sel), 2),
         "sys_avail_gib_min": round(min(float(r["sys_avail_gib"]) for r in sel), 2),
     }
+    # M-1: resident GPU memory is the SUM of the two pools (VRAM carve-out + GTT).
+    # Only emitted when the trace actually recorded GTT: filling it in from VRAM
+    # alone is what published a 59 GiB cell as "0.87 GiB peak". A resources.csv
+    # without the gtt_used_gib column is a pre-2026-10-22 trace and gets no
+    # mem_gib_max rather than a wrong one.
+    if all(r.get("gtt_used_gib") for r in sel):
+        stats["gtt_gib_max"] = round(max(float(r["gtt_used_gib"]) for r in sel), 2)
+        stats["mem_gib_max"] = round(max(float(r["vram_used_gib"]) + float(r["gtt_used_gib"])
+                                         for r in sel), 2)
+    return stats
 
 
 def load_matrix():
@@ -382,10 +406,14 @@ def main():
             "ctx_server": args.ctx,
             "ctx_bench": "model-default (4096)",
             "kv_cache": args.kv,
-            "kernel": platform.release(),
-            "mesa": mesa_version(),
+            **stack_stamp(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
+            # M-2: a --cells selection that does not cover the matrix is a probe.
+            # Stamp it so a later full sweep's consolidate() cannot fold its rows
+            # into the published rollup as the "latest" value for those cells.
+            "partial": not tracks_rollup([c["id"] for c in cells],
+                                         [c["id"] for c in matrix["cells"]]),
             "forced": args.force}
     json.dump(meta, open(f"{rdir}/run.json", "w"), indent=1)
     open_sweep_log(f"{rdir}/sweep.log")
@@ -404,14 +432,14 @@ def main():
         Returns True to proceed; False means hard-fail (caller exits). --force
         downgrades to a contamination warning rather than a stop.
         """
-        ok, busy, vram = wait_idle(tag)
+        ok, busy, mem = wait_idle(tag)
         if not ok:
             if not args.force:
                 log(f"[{tag}] GPU NOT idle after {IDLE_SETTLE_S}s "
-                    f"(busy={busy}%, vram={vram:.1f} GiB) — stop the running "
+                    f"(busy={busy}%, vram+gtt={mem:.1f} GiB) — stop the running "
                     "llama-server and rerun, or pass --force")
                 return False
-            log(f"[{tag}] GPU not idle (busy={busy}%, vram={vram:.1f} GiB) but --force: "
+            log(f"[{tag}] GPU not idle (busy={busy}%, vram+gtt={mem:.1f} GiB) but --force: "
                 "continuing, this cell's results are CONTAMINATED")
         return True
 
@@ -522,15 +550,35 @@ def harness_commit(repo):
         return "unknown"
 
 
+def parse_mesa(text):
+    """The RADV/Mesa version out of `vulkaninfo --summary` output, or 'unknown'.
+
+    Split out of the probe so the parsing is testable on a machine without a GPU:
+    CI runners have no vulkaninfo, and a stamping test that needs one is a test
+    that skips exactly where nobody is watching.
+    """
+    m = re.search(r"driverInfo\s*=\s*(Mesa[^\n]+)", text or "")
+    return m.group(1).strip() if m else "unknown"
+
+
 def mesa_version():
-    """Best-effort RADV/Mesa version for provenance (D7: numbers are stack-stamped)."""
+    """Best-effort RADV/Mesa version for provenance (D7: numbers are stack-stamped).
+
+    Returns 'unknown' when vulkaninfo or Mesa is absent. That is an honest stamp —
+    the alternative, raising, would abort a sweep on any machine that is not the
+    reference box.
+    """
     try:
         out = subprocess.run(["vulkaninfo", "--summary"], capture_output=True, text=True,
                              timeout=20).stdout
-        m = re.search(r"driverInfo\s*=\s*(Mesa[^\n]+)", out)
-        return m.group(1).strip() if m else "unknown"
     except Exception:
         return "unknown"
+    return parse_mesa(out)
+
+
+def stack_stamp():
+    """The stack a run was measured on, as stamped into run.json (D7)."""
+    return {"kernel": platform.release(), "mesa": mesa_version()}
 
 
 def tracks_rollup(selected_ids, all_ids):
@@ -543,8 +591,16 @@ def consolidate(repo=REPO):
     rows = []
     for rj in sorted(glob.glob(f"{repo}/results/run-*/**/run.json", recursive=True)):
         rd_ = os.path.dirname(rj)
-        # run.json only locates the run dir (via the glob above); its contents are
-        # not needed here, so don't open it.
+        # M-2: skip a partial sweep (--cells ...). The driver refuses to
+        # consolidate one itself, but every later full sweep calls consolidate(),
+        # and without this the probe's rows come back as the "latest" value for
+        # the cells it touched (run-20261022-0917 did exactly that).
+        try:
+            with open(rj) as f:
+                if json.load(f).get("partial"):
+                    continue
+        except (OSError, ValueError):
+            pass
         for cj in sorted(glob.glob(f"{rd_}/*/cell.json")):
             with open(cj) as f:
                 s = json.load(f)
@@ -586,8 +642,18 @@ def consolidate(repo=REPO):
             if cw:
                 rows.append({**base, "metric": "temp_c_max", "unit": "C",
                              "value": cw["temp_c_max"], "note": ""})
+                # M-1: vram_peak_gib is the VRAM pool alone. On a small UMA
+                # carve-out the weights live in GTT and this column sits at the
+                # idle floor, so mem_peak_gib carries residency; the plain-VRAM
+                # figure stays for the runs that predate GTT tracking.
                 rows.append({**base, "metric": "vram_peak_gib", "unit": "GiB",
-                             "value": cw["vram_gib_max"], "note": ""})
+                             "value": cw["vram_gib_max"],
+                             "note": "VRAM pool only; residency = mem_peak_gib"
+                                     if "mem_gib_max" in cw else ""})
+                if "mem_gib_max" in cw:
+                    rows.append({**base, "metric": "mem_peak_gib", "unit": "GiB",
+                                 "value": cw["mem_gib_max"],
+                                 "note": "peak resident GPU memory (VRAM + GTT)"})
             if s.get("tok_per_w"):
                 rows.append({**base, "metric": "tok_per_w", "unit": "t/s/W",
                              "value": s["tok_per_w"], "note": "server tg / probe W mean"})
@@ -613,14 +679,16 @@ def consolidate(repo=REPO):
           f"> Rollup built by harness `{rollup_commit[:12]}`. Sustained = llama-server "
           "streaming 512-token generations. bench = llama-bench (mean of repeats). "
           "probe W = GPU power mean during server phase. TTFT mean is inflated where "
-          "the per-request spread is wide (Vulkan) — compare with p50.", ""]
+          "the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = "
+          "peak (VRAM + GTT), the residency figure; runs that predate GTT sampling "
+          "show the VRAM pool only.", ""]
     runs = {}
     for r in rows:
         runs.setdefault((r["run_id"], r["backend"]), []).append(r)
     for (rid, be), rs in sorted(runs.items()):
         md.append(f"## {rid} — {be}")
         md.append("")
-        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |")
+        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |")
         md.append("|---|---|---|---|---|---|---|---|---|---|")
         bycell = {}
         for r in rs:
@@ -633,7 +701,9 @@ def consolidate(repo=REPO):
                 s=m.get("tg_server_tps", "–"), t=m.get("ttft_ms", "–"),
                 t50=m.get("ttft_ms_p50", "–"),
                 w=m.get("power_w_probe", "–"), e=m.get("tok_per_w", "–"),
-                v=m.get("vram_peak_gib", "–")))
+                # M-1: publish residency (VRAM + GTT) when the run recorded GTT,
+                # and fall back to the VRAM pool for runs that predate it.
+                v=m.get("mem_peak_gib") or m.get("vram_peak_gib", "–")))
         md.append("")
     with open(f"{repo}/results/table.md", "w") as f:
         f.write("\n".join(md))

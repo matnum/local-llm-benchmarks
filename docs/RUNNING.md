@@ -246,7 +246,9 @@ so a stale figure cannot ship with fresh numbers.
   under their own run ids. Measured over **all 20 cell/backend pairs** (not the two-cell
   pilot this bullet used to quote), the newer stack is **pp2048 2.6–31.3% lower** — the
   outlier is Poro 2 70B on Vulkan, −31.3% — and **tg512 inside −2.8…+0.9%**. Do not mix rows
-  from two stacks into one comparison, and stamp the stack in any new `run.json`.
+  from two stacks into one comparison, and stamp the stack in any new `run.json`
+  (the stamp reads `"unknown"` on a machine without `vulkaninfo`, e.g. a CI runner —
+  that is the honest value, and the parsing that produces it is pinned without a GPU).
 
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets

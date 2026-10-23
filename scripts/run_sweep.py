@@ -406,8 +406,7 @@ def main():
             "ctx_server": args.ctx,
             "ctx_bench": "model-default (4096)",
             "kv_cache": args.kv,
-            "kernel": platform.release(),
-            "mesa": mesa_version(),
+            **stack_stamp(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
             # M-2: a --cells selection that does not cover the matrix is a probe.
@@ -551,15 +550,35 @@ def harness_commit(repo):
         return "unknown"
 
 
+def parse_mesa(text):
+    """The RADV/Mesa version out of `vulkaninfo --summary` output, or 'unknown'.
+
+    Split out of the probe so the parsing is testable on a machine without a GPU:
+    CI runners have no vulkaninfo, and a stamping test that needs one is a test
+    that skips exactly where nobody is watching.
+    """
+    m = re.search(r"driverInfo\s*=\s*(Mesa[^\n]+)", text or "")
+    return m.group(1).strip() if m else "unknown"
+
+
 def mesa_version():
-    """Best-effort RADV/Mesa version for provenance (D7: numbers are stack-stamped)."""
+    """Best-effort RADV/Mesa version for provenance (D7: numbers are stack-stamped).
+
+    Returns 'unknown' when vulkaninfo or Mesa is absent. That is an honest stamp —
+    the alternative, raising, would abort a sweep on any machine that is not the
+    reference box.
+    """
     try:
         out = subprocess.run(["vulkaninfo", "--summary"], capture_output=True, text=True,
                              timeout=20).stdout
-        m = re.search(r"driverInfo\s*=\s*(Mesa[^\n]+)", out)
-        return m.group(1).strip() if m else "unknown"
     except Exception:
         return "unknown"
+    return parse_mesa(out)
+
+
+def stack_stamp():
+    """The stack a run was measured on, as stamped into run.json (D7)."""
+    return {"kernel": platform.release(), "mesa": mesa_version()}
 
 
 def tracks_rollup(selected_ids, all_ids):

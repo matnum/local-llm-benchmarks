@@ -40,3 +40,6 @@ jobs:
         run: |
           echo "Tests that skip on a clean checkout:"
           echo "  test_score_ll.* — needs the compiled scorer + fixture GGUF"
+          echo "  test_defaults.test_live_mesa_probe_reports_mesa_when_the_box_has_it"
+          echo "    — the runner has no vulkaninfo/Mesa; the parsing and the run.json"
+          echo "      stamp are pinned by tests that need no GPU."

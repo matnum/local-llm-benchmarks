@@ -73,9 +73,59 @@ class DefaultsWiredTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             p.parse_args(["--kv", "q4_0"])
 
-    def test_stack_versions_are_reportable(self):
-        """D7: numbers are stack-stamped, so the driver must report the Mesa string."""
-        self.assertIn("Mesa", run_sweep.mesa_version())
+    def test_mesa_string_is_parsed_from_vulkaninfo_output(self):
+        """D7: the stack stamp comes from vulkaninfo's driverInfo line.
+
+        The real output on the reference box (2026-10-23):
+            driverName         = radv
+            driverInfo         = Mesa 26.2.4-arch3.1
+        Pinned here so a Mesa output reflow cannot silently turn the stamp into
+        'unknown' on the box whose numbers are published.
+        """
+        sample = (
+            "==========\nVULKANINFO\n==========\n\n"
+            "Vulkan Instance Version: 1.4.354\n\n"
+            "Devices:\n========\nGPU0:\n"
+            "\tapiVersion         = 1.4.354\n"
+            "\tdriverVersion      = 26.2.4\n"
+            "\tdriverName         = radv\n"
+            "\tdriverInfo         = Mesa 26.2.4-arch3.1\n"
+        )
+        self.assertEqual(run_sweep.parse_mesa(sample), "Mesa 26.2.4-arch3.1")
+
+    def test_mesa_parser_reports_unknown_instead_of_lying(self):
+        """No vulkaninfo output, or a non-Mesa driver, is 'unknown' — never a guess."""
+        for text in ("", None,
+                     "driverInfo         = NVIDIA 580.82.07\n",
+                     "apiVersion         = 1.4.354\n"):
+            with self.subTest(text=text):
+                self.assertEqual(run_sweep.parse_mesa(text), "unknown")
+
+    def test_run_json_stack_stamp_always_carries_both_fields(self):
+        """The stamp must carry kernel + mesa on every machine, including a CI runner.
+
+        CI has no vulkaninfo, so the value there is 'unknown' — the property is that
+        the field exists and is a string, not that it names a Mesa version. Requiring
+        a Mesa string here (as this test used to) failed on every GitHub runner.
+        """
+        stamp = run_sweep.stack_stamp()
+        self.assertEqual(set(stamp), {"kernel", "mesa"})
+        for key, value in stamp.items():
+            with self.subTest(field=key):
+                self.assertIsInstance(value, str)
+                self.assertTrue(value.strip(), f"{key} stamped empty")
+
+    def test_live_mesa_probe_reports_mesa_when_the_box_has_it(self):
+        """The live probe, where it can run: the reference box, not CI.
+
+        Parsing is pinned above without a GPU; this only checks that the probe
+        reaches vulkaninfo when one is installed, and skips rather than failing on a
+        machine that has none.
+        """
+        version = run_sweep.mesa_version()
+        if version == "unknown":
+            self.skipTest("no vulkaninfo/Mesa on this machine — parser covered above")
+        self.assertIn("Mesa", version)
 
 
 if __name__ == "__main__":

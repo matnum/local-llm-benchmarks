@@ -16,13 +16,15 @@ operator guide is [docs/RUNNING.md](RUNNING.md); the machine fingerprint is
 | D5 | **FIN-bench prompts come from the upstream templates verbatim** (2026-10-21). `scripts/fetch_finbench_upstream.py` vendors the `doc_to_text`/`description` strings from `LumiOpen/lm-evaluation-harness` @ `finbench_v2` into `docs/finbench/upstream-<sha>.json`; the driver renders them with Jinja2 instead of hand-copying prose. | A prompt can never drift from upstream by transcription, and the whole 5×2×5 grid is reachable (`--formulation`, `--variant`). One pair per run; `summary.json` stamps formulation, variant and upstream commit. Tests pin the grid, including upstream quirks (scandisent/mcf/p3 "positivinen"; belebele/mcf scores A–D while numbering 1–4). A `--pilot` run writes its rollup inside the run directory so a sample can never replace the tracked table. |
 | D6 | **TTFT is reported as measured, with its mechanism documented, until the protocol is fixed** (2026-10-22). Four controlled runs (27B and 32B, Vulkan) showed the inflation is KV-cache work after a long generation, and quantisation-dependent on the 27B: q8 KV → ~0.79 s base + ~0.9 s stall per request, f16 → ~0.14 s + ~0.28 s; the 32B is unaffected by KV type. | The `ttft_ms`/`ttft_ms_p50` columns stay as measured but are explicitly not comparable across cells or backends (README + RUNNING §7). A future TTFT axis must state its KV type; options are f16 KV or a cold-request protocol, followed by a ten-cell re-probe. |
 | D7 | **Published numbers are stack-stamped** (2026-10-22). The tracked tables were measured on kernel 7.2.8 / Mesa 26.2.3; the machine now runs 7.2.10 / 26.2.4, where re-checked cells are 8–11% lower on `pp2048` and unchanged on `tg512`. | New runs must not be mixed into the published tables without re-measuring the rest, and `run.json` should carry the stack versions alongside the llama.cpp commit. |
+| D8 | **The published tables are re-measured after the stack change, and the prose moves with the data** (2026-10-22/23). All ten cells ran on both backends on kernel 7.2.10 / Mesa 26.2.4 after the GPU-memory fix. Measured over the full grid the newer stack is `pp2048` **2.6–31.3% lower** (Poro 2 70B Vulkan is the −31.3% outlier) and `tg512` inside **−2.8…+0.9%** — D7's two-cell pilot figure understated it. The morning pair measured before the memory fix is excluded as `superseded-pre-mem-fix-*`. | The rollup keeps both stacks under separate run ids; README tables, chart stamps, `table.md` and the hand-written prose are regenerated from the new rollup in one commit, so no table mixes stacks. The published comparisons now carry **direction counts and ties**: `tests/test_readme_ranges.py` pins "N of 10" against the rollup and treats a gap under 2% as a tie — which is what the Qwen3.5-35B prefill cell (0.7%) became. |
 
 ## 2. Reference environment
 
 Full fingerprint in [docs/env.md](env.md). Summary: AMD Ryzen AI Max+ 395
-(Strix Halo, 16C/32T), Radeon 8060S iGPU with 96 GiB VRAM, 128 GB unified
-LPDDR5X-8000 (~256 GB/s), CachyOS (Arch-based, kernel 7.2.8), Mesa 26.2.3 RADV
-(Vulkan) and ROCm 7.2.4 (`gfx1151` natively), llama.cpp pinned at `5b59b83f4`.
+(Strix Halo, 16C/32T), Radeon 8060S iGPU (1 GiB VRAM carve-out + 104 GiB GTT pool
+since 2026-10-22), 128 GB unified LPDDR5X-8000 (~256 GB/s), CachyOS (Arch-based,
+kernel 7.2.10), Mesa 26.2.4 RADV (Vulkan) and ROCm 7.2.4 (`gfx1151` natively),
+llama.cpp pinned at `5b59b83f4`.
 
 ## 3. Methodology
 

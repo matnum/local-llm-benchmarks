@@ -660,14 +660,16 @@ def consolidate(repo=REPO):
           f"> Rollup built by harness `{rollup_commit[:12]}`. Sustained = llama-server "
           "streaming 512-token generations. bench = llama-bench (mean of repeats). "
           "probe W = GPU power mean during server phase. TTFT mean is inflated where "
-          "the per-request spread is wide (Vulkan) — compare with p50.", ""]
+          "the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = "
+          "peak (VRAM + GTT), the residency figure; runs that predate GTT sampling "
+          "show the VRAM pool only.", ""]
     runs = {}
     for r in rows:
         runs.setdefault((r["run_id"], r["backend"]), []).append(r)
     for (rid, be), rs in sorted(runs.items()):
         md.append(f"## {rid} — {be}")
         md.append("")
-        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | VRAM peak GiB |")
+        md.append("| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |")
         md.append("|---|---|---|---|---|---|---|---|---|---|")
         bycell = {}
         for r in rs:
@@ -680,7 +682,9 @@ def consolidate(repo=REPO):
                 s=m.get("tg_server_tps", "–"), t=m.get("ttft_ms", "–"),
                 t50=m.get("ttft_ms_p50", "–"),
                 w=m.get("power_w_probe", "–"), e=m.get("tok_per_w", "–"),
-                v=m.get("vram_peak_gib", "–")))
+                # M-1: publish residency (VRAM + GTT) when the run recorded GTT,
+                # and fall back to the VRAM pool for runs that predate it.
+                v=m.get("mem_peak_gib") or m.get("vram_peak_gib", "–")))
         md.append("")
     with open(f"{repo}/results/table.md", "w") as f:
         f.write("\n".join(md))

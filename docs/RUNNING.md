@@ -4,8 +4,11 @@ Operator guide for `scripts/run_sweep.py` — the one-command sweep driver.
 Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLAN.md)
 (design decisions + methodology), [env.md](env.md) (reference-machine fingerprint).
 
-> **State:** the full sweep is done — ten cells × two backends, as the first five
-> (2026-10-02) plus five more (2026-10-03) — see
+> **State:** the full sweep is done and re-measured — ten cells × two backends. The
+> published tables come from the 2026-10-22 pass on kernel 7.2.10 / Mesa 26.2.4; the
+> 2026-10-02/03 rows stay in the rollup under their own ids, and the 2026-10-22 morning
+> pair (measured before the GPU-memory fix) is renamed `superseded-pre-mem-fix-*` and
+> excluded from the rollup — see
 > [results/table.md](../results/table.md). The harness is independently reviewed
 > ([the independent review](reviews/2026-10-04-independent-review.md)). This guide
 > documents how to run it.
@@ -156,14 +159,21 @@ contributes no data either way: `consolidate()` emits rows only from cells with 
 `cell.json`, and the failed run has none — it stays on disk as evidence (its `run.json`
 records `forced: true`).
 
+A run that is superseded — replaced by a better pass on the same stack, or measured with a
+harness whose metadata was wrong — is renamed `results/superseded-<reason>-<run-id>/` and
+falls **outside** `consolidate()`'s `results/run-*` glob, so it can never re-enter the rollup
+or a published table. Example: `superseded-pre-mem-fix-20261022-0919` and `-1001`, the
+morning pair measured before the VRAM+GTT fix, replaced by the evening pair after it.
+
 ## 6. Reading the results
 
 - **`consolidated.csv`** — one row per (run, cell, metric). Columns:
   `run_id, backend, cell, model, quant, size_gib, metric, unit, value, note`.
   `metric` values: `pp512_bench_tps`, `pp2048_bench_tps`, `tg512_bench_tps` (llama-bench
   means), `tg_server_tps`, `ttft_ms` / `ttft_ms_p50` (streaming, from the probe),
-  `power_w_probe` / `power_w_bench` (W means in each window), `temp_c_max`, `vram_peak_gib`,
-  `tok_per_w`.
+  `power_w_probe` / `power_w_bench` (W means in each window), `temp_c_max`, `vram_peak_gib`
+  (the VRAM pool alone), `mem_peak_gib` (residency = VRAM + GTT, only for runs whose trace
+  records GTT), `tok_per_w`.
   The `note` carries the actual repeat/request count (e.g. "streaming, mean of 3").
 - **`table.md`** — one table per (run, backend); the headline comparison view.
 
@@ -202,6 +212,9 @@ so a stale figure cannot ship with fresh numbers.
   no `gtt_used_gib` column and therefore **no** `mem_peak_gib`: their `vram_peak_gib` is the
   residency figure only because those runs predate the carve-out change. `vram_peak_gib` is
   still emitted (it is what the counter said) but it is **not** residency on the current box.
+  The README table and `results/table.md` publish `mem_peak_gib` and fall back to
+  `vram_peak_gib` only for runs without GTT sampling; `tests/test_readme_tables.py` fails if a
+  published cell has no residency row, so the dead counter cannot come back as a headline.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
 - **TTFT is per-request state, not just latency: on Vulkan it includes KV-cache bookkeeping.**
@@ -227,11 +240,13 @@ so a stale figure cannot ship with fresh numbers.
   work. Do not compare them across cells or backends, and any future TTFT measurement must state its
   KV type. Per-request values are in `ttft.json`. This supersedes the 2026-10-02 note that described
   "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
-- **Numbers are stack-stamped.** The tracked rows were measured on kernel 7.2.8 / Mesa 26.2.3
-  (`docs/env.md`). The machine now runs kernel 7.2.10 / Mesa 26.2.4, where re-checking one cell per
-  size gives **pp2048 8–11% lower** (27B 328.65 → 293.75, 32B 264.51 → 242.41 tok/s) while **tg512 is
-  unchanged** (10.60 → 10.56, 9.71 → 9.71). Do not mix new runs into the published tables without
-  re-measuring the rest first, and stamp the stack in any new `run.json`.
+- **Numbers are stack-stamped, and the published tables were re-measured.** The tracked
+  tables now come from the 2026-10-22 sweeps: kernel 7.2.10 / Mesa 26.2.4 (`docs/env.md`).
+  The 2026-10-02/03 rows were measured on kernel 7.2.8 / Mesa 26.2.3 and stay in the rollup
+  under their own run ids. Measured over **all 20 cell/backend pairs** (not the two-cell
+  pilot this bullet used to quote), the newer stack is **pp2048 2.6–31.3% lower** — the
+  outlier is Poro 2 70B on Vulkan, −31.3% — and **tg512 inside −2.8…+0.9%**. Do not mix rows
+  from two stacks into one comparison, and stamp the stack in any new `run.json`.
 
 - **ROCm gfx1151** is seen natively (no override needed for a clean load). If a MoE/MXFP4 op
   misbehaves, re-run that backend with `--rocm-override` (sets

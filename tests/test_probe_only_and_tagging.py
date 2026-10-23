@@ -154,6 +154,24 @@ class RunTagTest(unittest.TestCase):
         self.assertIn("Vulkan full sweep", msg)
         self.assertIn("KV q8_0", msg)
 
+    def test_pending_tags_are_counted_so_back_to_back_sweeps_differ(self):
+        """A sweep stamps its tag but the human commits later: the next sweep must not reuse it."""
+        with tempfile.TemporaryDirectory() as repo:
+            for run, backend, tag in (("run-A", "vulkan", "run-20261023-1"),
+                                      ("run-B", "rocm", "run-20261023-2"),
+                                      ("run-C", "vulkan", None)):
+                d = os.path.join(repo, "results", run, backend)
+                os.makedirs(d)
+                with open(os.path.join(d, "run.json"), "w") as f:
+                    json.dump({"run_id": run, "backend": backend, "tag": tag}, f)
+            broken = os.path.join(repo, "results", "run-D", "vulkan")
+            os.makedirs(broken)
+            with open(os.path.join(broken, "run.json"), "w") as f:
+                f.write("not json")
+            names = run_sweep.planned_tags(repo)
+            self.assertEqual(sorted(names), ["run-20261023-1", "run-20261023-2"])
+            self.assertEqual(run_sweep.next_run_tag(names, "20261023"), "run-20261023-3")
+
 
 if __name__ == "__main__":
     unittest.main()

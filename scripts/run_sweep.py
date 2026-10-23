@@ -525,7 +525,8 @@ def main():
         # this, the tag was hand-typed and the 2026-10-22 sweeps simply never got
         # one, leaving the published numbers without the provenance every earlier
         # sweep had.
-        planned = next_run_tag(repo_tags(REPO), time.strftime("%Y%m%d"))
+        planned = next_run_tag(repo_tags(REPO) + planned_tags(REPO),
+                               time.strftime("%Y%m%d"))
         msg = tag_message(args.backend, len(cells), harness_commit, commit,
                           meta.get("kernel", "unknown"), meta.get("mesa", "unknown"),
                           args.kv, args.probe_only)
@@ -652,6 +653,26 @@ def repo_tags(repo):
                               capture_output=True, text=True).stdout.split()
     except Exception:
         return []
+
+
+def planned_tags(repo):
+    """Tag names already stamped into run dirs by sweeps that have not been tagged yet.
+
+    A sweep stamps its intended tag into run.json and then waits for a human to
+    commit, so two sweeps back to back would both derive the same name. Counting the
+    pending names keeps the sequence honest without creating a tag on a commit that
+    does not contain the data.
+    """
+    names = []
+    for rj in glob.glob(f"{repo}/results/run-*/*/run.json"):
+        try:
+            with open(rj) as f:
+                name = json.load(f).get("tag")
+        except (OSError, ValueError):
+            continue
+        if name:
+            names.append(name)
+    return names
 
 
 def results_match_head(repo):

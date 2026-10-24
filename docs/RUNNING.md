@@ -269,10 +269,27 @@ results/
         cell.json                   # THE result: bench + ttft + resource windows + tok_per_w
   consolidated.csv                  # tracked rollup across all runs
   table.md                          # tracked rendered markdown across all runs
+  ttft-per-request.csv              # tracked: per-request TTFT, both protocols (§3c)
+  bench-logs/<run>/<backend>/<cell>.log  # tracked: verbatim llama-bench output for the
+                                    # sweeps that own the published bench columns
+  sampler-support.csv               # tracked: per-window sample count/duration + the
+                                    # power/temp/memory aggregate the rollup copies
 ```
 
-Raw run dirs (`results/run-*/`) are **gitignored**; only `consolidated.csv` + `table.md` are
-tracked. The failed smoke dir is named `...-SMOKE-FAILED` so it is visually distinct, and it
+Raw run dirs (`results/run-*/`) are **gitignored**; the rollups plus the three extracts
+above are tracked. The extracts exist so a reader can check a published number without the
+run dirs (review 5.3): `ttft-per-request.csv` re-derives `ttft_ms`/`ttft_ms_p50`,
+`bench-logs/` re-derives the three llama-bench means and their ±sd through the driver's own
+`parse_bench()`, and `sampler-support.csv` shows how many 5 Hz samples (and how many
+seconds) back each published power/temperature/memory figure — the traces themselves are
+12k rows per sweep, too large to ship. `tests/test_ttft_extract.py` and
+`tests/test_bench_extract.py` pin both directions.
+
+`llama-bench -r 3` prints one `mean ± sd` row and does **not** keep the three repeats, so a
+per-repeat bench extract cannot be built from the stored data — the log is the finest
+artifact that exists.
+
+The failed smoke dir is named `...-SMOKE-FAILED` so it is visually distinct, and it
 contributes no data either way: `consolidate()` emits rows only from cells with a
 `cell.json`, and the failed run has none — it stays on disk as evidence (its `run.json`
 records `forced: true`).

@@ -19,5 +19,9 @@ results/finbench-*/
 __pycache__/
 *.pyc
 *.log
+# ...except the vendored llama-bench logs behind the published bench columns
+# (review: bench/power/memory had no checkable extract); these are tracked.
+!results/bench-logs/
+!results/bench-logs/**/*.log
 .DS_Store
 .pytest_cache/

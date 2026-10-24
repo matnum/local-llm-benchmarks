@@ -377,9 +377,14 @@ What is pinned, and where:
   (`tests/test_rollup_protocol_consistency.py`). The TTFT column's per-request data
   for **both** protocols is tracked in `results/ttft-per-request.csv` and
   re-derived from it (`tests/test_ttft_extract.py`), which also checks the
-  per-request table in `docs/RUNNING.md` §3c against the extract — so the latency
-  argument is checkable without the gitignored run directories. CI runs them on
-  every pull request.
+  per-request table in `docs/RUNNING.md` §3c against the extract. The bench, power,
+  temperature and memory columns are covered too: `results/bench-logs/` carries the
+  verbatim `llama-bench` output the three bench means come from and is re-parsed by
+  the driver's own parser, and `results/sampler-support.csv` publishes the sample
+  count and duration behind every window aggregate
+  (`tests/test_bench_extract.py`). So the latency argument and the throughput
+  argument are both checkable without the gitignored run directories. CI runs them
+  on every pull request.
 
 ## Repository layout
 

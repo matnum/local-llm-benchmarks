@@ -1,0 +1,30 @@
+| model                          |       size |     params | backend    | ngl |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | --------------: | -------------------: |
+| qwen3 4B Q8_0                  |   3.98 GiB |     4.02 B | ROCm       |  99 |           pp512 |      2431.20 ± 72.03 |
+
+build: 5b59b83f4 (1)
+
+--- stderr ---
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 106496 MiB):
+  Device 0: AMD Radeon 8060S Graphics, gfx1151 (0x1151), VMM: no, Wave Size: 32, VRAM: 106496 MiB
+
+| model                          |       size |     params | backend    | ngl |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | --------------: | -------------------: |
+| qwen3 4B Q8_0                  |   3.98 GiB |     4.02 B | ROCm       |  99 |          pp2048 |      2329.53 ± 27.09 |
+
+build: 5b59b83f4 (1)
+
+--- stderr ---
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 106496 MiB):
+  Device 0: AMD Radeon 8060S Graphics, gfx1151 (0x1151), VMM: no, Wave Size: 32, VRAM: 106496 MiB
+
+| model                          |       size |     params | backend    | ngl |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | --------------: | -------------------: |
+| qwen3 4B Q8_0                  |   3.98 GiB |     4.02 B | ROCm       |  99 |           tg512 |         46.83 ± 0.02 |
+
+build: 5b59b83f4 (1)
+
+--- stderr ---
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 106496 MiB):
+  Device 0: AMD Radeon 8060S Graphics, gfx1151 (0x1151), VMM: no, Wave Size: 32, VRAM: 106496 MiB
+

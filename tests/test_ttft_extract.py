@@ -20,6 +20,8 @@ import csv
 import os
 import re
 import statistics
+import subprocess
+import sys
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,11 +29,33 @@ EXTRACT = os.path.join(REPO, "results", "ttft-per-request.csv")
 ROLLUP = os.path.join(REPO, "results", "consolidated.csv")
 RUNNING = os.path.join(REPO, "docs", "RUNNING.md")
 
-COLD_RUNS = {("run-20261024-0910", "vulkan"), ("run-20261024-0930", "rocm")}
+COLD_RUNS = {("run-20261024-0910", "vulkan"), ("run-20261024-0930", "rocm"),
+             ("run-20261024-1749", "rocm"), ("run-20261024-1812", "vulkan")}
 WARM_RUNS = {("run-20261023-1140", "vulkan"), ("run-20261023-1159", "rocm")}
 RUNS = COLD_RUNS | WARM_RUNS
 
-# "| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 55.3 / 53.4 / 55.6 | 2.2 |"
+# The cold pass the docs publish per backend (the second quiet pass, for the
+# repeatability band above). The docs cite these; the extract holds both.
+PUBLISHED_COLD = {"vulkan": "run-20261024-1812", "rocm": "run-20261024-1749"}
+
+# "| vulkan | `run-20261024-0910` → `run-20261024-1812` | −6.2…+1.5% | 0.8% |
+#  `poro2-8b-q8_0` −6.2% | −3.1…+0.2% |"  (minus signs are U+2212)
+REPEAT_ROW = re.compile(
+    r"^\| (?P<backend>vulkan|rocm) \| `(?P<run_a>run-\d{8}-\d{4})` → "
+    r"`(?P<run_b>run-\d{8}-\d{4})` \| (?P<p50>[−+][\d.]+…[−+][\d.]+%) \| "
+    r"(?P<median>[\d.]+%) \| `(?P<worst>[a-z0-9._\-]+)` (?P<worst_delta>[−+][\d.]+%) \| "
+    r"(?P<tg>[−+][\d.]+…[−+][\d.]+%) \|$", re.MULTILINE)
+
+MINUS = str.maketrans({"−": "-"})
+
+
+def _range(text):
+    """'−6.2…+1.5%' -> (-6.2, 1.5)."""
+    lo, hi = text.rstrip("%").split("…")
+    return float(lo.translate(MINUS)), float(hi.translate(MINUS))
+
+
+# "| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 53.8 / 54.8 / 55.4 | 1.6 |"
 SECTION_3C_ROW = re.compile(
     r"^\| `(?P<cell>[^`]+)` \| (?P<backend>vulkan|rocm) \| "
     r"(?P<warm>[-\d. /]+) \| (?P<warm_spread>[\d.]+) \| "
@@ -73,8 +97,8 @@ class PerRequestExtractTest(unittest.TestCase):
         pairs = {(r["run_id"], r["backend"]) for r in self.rows}
         self.assertEqual(pairs, RUNS, "the extract must describe exactly the published runs")
         self.assertEqual({r["protocol"] for r in self.rows}, {"cold", "warm"})
-        self.assertEqual(len(self.rows), 120,
-                         "4 runs x 10 cells x 3 requests (2 cold, 2 warm)")
+        self.assertEqual(len(self.rows), 180,
+                         "6 runs x 10 cells x 3 requests (4 cold, 2 warm)")
 
     def test_erased_tokens_mark_the_protocol(self):
         """Cold rows must show the erase dropped a populated cache; warm rows cannot."""
@@ -110,9 +134,10 @@ class PerRequestExtractTest(unittest.TestCase):
 
     def test_published_warm_to_cold_delta_range_reproduces(self):
         """README/§3c quote +20..+493% (Vulkan) and +58..+397% (ROCm) on p50."""
-        for backend, lo, hi in (("vulkan", 20, 493), ("rocm", 58, 397)):
+        for backend, lo, hi in (("vulkan", 21, 495), ("rocm", 58, 386)):
             with self.subTest(backend=backend):
-                cold = {k[2]: v for k, v in self.groups("cold").items() if k[1] == backend}
+                cold = {k[2]: v for k, v in self.groups("cold").items()
+                        if k[1] == backend and k[0] == PUBLISHED_COLD[backend]}
                 warm = {k[2]: v for k, v in self.groups("warm").items() if k[1] == backend}
                 self.assertEqual(set(cold), set(warm))
                 deltas = [round((statistics.median(cold[c]) / statistics.median(warm[c])
@@ -146,7 +171,8 @@ class PerRequestExtractTest(unittest.TestCase):
             for protocol in ("warm", "cold"):
                 txt, spread_txt = cited[protocol]
                 key = next((k for k in sources[protocol]
-                            if k[1] == backend and k[2] == cell), None)
+                            if k[1] == backend and k[2] == cell
+                            and (protocol == "warm" or k[0] == PUBLISHED_COLD[backend])), None)
                 self.assertIsNotNone(
                     key, f"§3c cites {cell}/{backend} {protocol} but the extract has no "
                          f"such run — publish the run it came from")
@@ -159,6 +185,59 @@ class PerRequestExtractTest(unittest.TestCase):
                                                msg=f"§3c says {txt}, extract says {vals}")
                     self.assertAlmostEqual(float(spread_txt), max(vals) - min(vals),
                                            delta=0.15, msg="cited spread != extract spread")
+
+
+    def test_repeatability_table_matches_the_extract(self):
+        """§3c's run-to-run band must be recomputable from the tracked per-request data."""
+        with open(RUNNING) as f:
+            text = f.read()
+        rows = REPEAT_ROW.findall(text)
+        self.assertEqual({r[0] for r in rows}, {"vulkan", "rocm"},
+                         "§3c's repeatability table is gone from docs/RUNNING.md")
+        for backend, run_a, run_b, p50_range, median_abs, worst, worst_delta, tg_range in rows:
+            pa = {k[2]: statistics.median(v) for k, v in self.groups("cold").items()
+                  if k[0] == run_a and k[1] == backend}
+            pb = {k[2]: statistics.median(v) for k, v in self.groups("cold").items()
+                  if k[0] == run_b and k[1] == backend}
+            self.assertEqual(set(pa), set(pb), "the compared passes must cover the same cells")
+            deltas = {c: (pb[c] / pa[c] - 1) * 100 for c in pa}
+            lo, hi = _range(p50_range)
+            worst_cell = max(deltas, key=lambda c: abs(deltas[c]))
+            with self.subTest(backend=backend):
+                self.assertAlmostEqual(min(deltas.values()), lo, delta=0.15)
+                self.assertAlmostEqual(max(deltas.values()), hi, delta=0.15)
+                self.assertAlmostEqual(
+                    statistics.median(abs(v) for v in deltas.values()),
+                    float(median_abs.rstrip("%")), delta=0.15)
+                self.assertEqual(worst_cell, worst,
+                                 f"worst cell is {worst_cell}, docs say {worst}")
+                self.assertAlmostEqual(deltas[worst_cell],
+                                       float(worst_delta.rstrip("%").translate(MINUS)),
+                                       delta=0.15)
+                # and the throughput side of the same two passes
+                ga, gb = {}, {}
+                for r in self.rows:
+                    if (r["run_id"], r["backend"]) == (run_a, backend):
+                        ga.setdefault(r["cell"], []).append(float(r["gen_tps"]))
+                    if (r["run_id"], r["backend"]) == (run_b, backend):
+                        gb.setdefault(r["cell"], []).append(float(r["gen_tps"]))
+                tg = {c: (statistics.fmean(gb[c]) / statistics.fmean(ga[c]) - 1) * 100
+                      for c in ga}
+                tg_lo, tg_hi = _range(tg_range)
+                self.assertAlmostEqual(min(tg.values()), tg_lo, delta=0.15)
+                self.assertAlmostEqual(max(tg.values()), tg_hi, delta=0.15)
+
+
+@unittest.skipUnless(os.path.isdir(os.path.join(REPO, "results", "run-20261024-1812")),
+                     "raw run dirs are only present on the machine that measured them")
+class ExtractRegenerationTest(unittest.TestCase):
+    def test_make_extracts_check_passes(self):
+        """The tracked extracts must be reproducible from the run dirs on this machine."""
+        proc = subprocess.run(
+            [sys.executable, os.path.join(REPO, "scripts", "make_extracts.py"), "--check"],
+            capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("extracts up to date", proc.stdout)
 
 
 if __name__ == "__main__":

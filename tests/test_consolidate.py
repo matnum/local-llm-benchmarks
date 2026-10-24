@@ -108,6 +108,24 @@ class ConsolidateTest(unittest.TestCase):
         self.assertIn("cellB", md)
 
 
+    def test_empty_checkout_is_refused_instead_of_wiped(self):
+        """`--consolidate` on a clone (no run dirs) must not empty the tracked rollup.
+
+        The writer is a full rewrite, so before this guard a fresh clone's
+        `--consolidate` replaced the published rollup with a header-only CSV and an
+        empty table.md — silent, and recoverable only by noticing.
+        """
+        csv_path = os.path.join(self.repo, "results", "consolidated.csv")
+        with open(csv_path, "w", newline="") as f:
+            f.write("run_id,backend,cell,model,quant,size_gib,metric,unit,value,note\n"
+                    "run-X,vulkan,cellX,m,q,1.0,tg_server_tps,t/s,1.0,note\n")
+        with self.assertRaises(SystemExit) as ctx:
+            run_sweep.consolidate(repo=self.repo)
+        self.assertIn("no run dirs", str(ctx.exception))
+        with open(csv_path) as f:
+            self.assertIn("run-X", f.read(), "the tracked rollup must be left untouched")
+
+
 class RollupOwnershipTest(unittest.TestCase):
     """Only a full sweep may rewrite the published rollup.
 

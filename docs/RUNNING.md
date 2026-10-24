@@ -133,11 +133,13 @@ What a probe-only run publishes, and why it is not a full sweep:
 
 **First use (2026-10-23):** the ten-cell f16 re-probe —
 `results/run-20261023-1140` (Vulkan) and `-1159` (ROCm), both `--kv f16 --probe-only` —
-answered the TTFT protocol question and doubles as the run-to-run noise measurement:
+answered the TTFT protocol question and doubled as the run-to-run noise measurement:
 `tg_server_tps` within −0.2…+1.4%, `ttft_ms` −4.4…+6.5%, `ttft_ms_p50` −5.9…+8.1% over
-20 cell/backend pairs (§7). The streaming columns in `results/table.md` and the README
-table now come from these two runs, each row keeping its own `run_id`; the bench, power
-and memory columns stay attributed to the 2026-10-22 full sweeps.
+20 cell/backend pairs (§7). Those two runs carried the streaming columns until the cold
+protocol replaced them on 2026-10-24 (§3c), which is what the README table publishes now;
+their per-request data is still tracked in `results/ttft-per-request.csv` as the warm side
+of that comparison. The bench, power and memory columns stay attributed to the 2026-10-22
+full sweeps.
 
 ## 3c. The cold-request TTFT protocol
 
@@ -396,7 +398,9 @@ so a stale figure cannot ship with fresh numbers.
   supersedes the 2026-10-02 note that described "first request fast, next two slow": the
   discriminator is the preceding generation, not the prompt.
 - **Numbers are stack-stamped, and the published tables were re-measured.** The tracked
-  tables now come from the 2026-10-22 sweeps: kernel 7.2.10 / Mesa 26.2.4 (`docs/env.md`).
+  tables' bench, power and memory columns come from the 2026-10-22 sweeps (their streaming
+  columns moved to the 2026-10-24 cold runs, §3c), all on kernel 7.2.10 / Mesa 26.2.4
+  (`docs/env.md`).
   The 2026-10-02/03 rows were measured on kernel 7.2.8 / Mesa 26.2.3 and stay in the rollup
   under their own run ids. Measured over **all 20 cell/backend pairs** (not the two-cell
   pilot this bullet used to quote), the newer stack is **pp2048 2.6–31.3% lower** — the

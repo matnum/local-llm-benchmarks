@@ -918,6 +918,16 @@ def render_table(rows, repo=REPO):
 
 def consolidate(repo=REPO):
     """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
+    if not glob.glob(f"{repo}/results/run-*"):
+        # A fresh clone/CI checkout has the tracked rollup but no raw run dirs, and
+        # the rebuild below is a full rewrite — so without this guard `--consolidate`
+        # on a clone overwrites the published rollup with an empty one. Refuse
+        # instead of destroying tracked data (recoverable with `git checkout`, but a
+        # footgun that costs a re-run to notice).
+        raise SystemExit(
+            f"no run dirs under {repo}/results — refusing to overwrite the tracked "
+            f"rollup with an empty one. Run this on the machine that measured the runs, "
+            f"or restore the tracked files with `git checkout -- results/`.")
     rows = build_rows(repo)
     # B3: rebuild the whole file ("w") — rows are already re-derived from ALL run
     # dirs above. Append mode re-emitted every run's rows on each call, so a Vulkan

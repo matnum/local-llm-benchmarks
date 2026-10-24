@@ -5,7 +5,9 @@ Companion docs: [README](../README.md) (what + hardware + matrix), [PLAN](../PLA
 (design decisions + methodology), [env.md](env.md) (reference-machine fingerprint).
 
 > **State:** the full sweep is done and re-measured — ten cells × two backends. The
-> published tables come from the 2026-10-22 pass on kernel 7.2.10 / Mesa 26.2.4; the
+> published throughput/energy/memory columns come from the 2026-10-22 pass on kernel 7.2.10 /
+> Mesa 26.2.4, and the published TTFT/`server tg` columns from the 2026-10-24 cold-request
+> re-measure (`run-20261024-0910` Vulkan, `run-20261024-0930` ROCm) on the same stack; the
 > 2026-10-02/03 rows stay in the rollup under their own ids, and the 2026-10-22 morning
 > pair (measured before the GPU-memory fix) is renamed `superseded-pre-mem-fix-*` and
 > excluded from the rollup — see
@@ -93,7 +95,9 @@ Options (from `--help`). Run-parameter defaults come from `matrix.yaml` `default
 | `--force` | off | skip the idle gate (results flagged contaminated) |
 | `--rocm-override` | off | set `HSA_OVERRIDE_GFX_VERSION=11.5.0` (gfx1151 fallback, see §7) |
 | `--consolidate` | off | rebuild `consolidated.csv` + `table.md` from existing run dirs and exit; no GPU, no `--backend` needed |
+| `--check` | off | verify that the tracked rollups match what the local run dirs would rebuild, and exit 1 on drift; read-only, local-only (raw run dirs are gitignored, so CI has none) — see §3c |
 | `--probe-only` | off | re-run **only** the `llama-server` + TTFT probe phase (no `llama-bench`), for re-measuring TTFT with a different KV type; see §3b |
+| `--ttft-protocol {cold,warm}` | `cold` (`matrix.yaml` `defaults.ttft_protocol`) | what a timed TTFT request starts from: `cold` erases the slot's KV cache first (published since 2026-10-24 — full prompt prefill + first token, no KV bookkeeping in the number); `warm` leaves the prompt cache alone and is the pre-2026-10-24 protocol, kept to reproduce those runs; see §3c and §7 |
 | `--tag` | off | after a full sweep, create the annotated run tag — but only when the tracked results already match HEAD, otherwise the exact commands are printed |
 
 ## 3b. Re-measuring one phase (`--probe-only`)
@@ -113,7 +117,7 @@ What a probe-only run publishes, and why it is not a full sweep:
 - `cell.json` carries `"probe_only": true`, an empty `bench` block and a `null`
   `bench_window`; `phases.json` has no bench phase.
 - `consolidate()` emits **only** `tg_server_tps`, `ttft_ms` and `ttft_ms_p50` from it, with
-  `[<kv> KV, probe-only run]` appended to each note.
+  `[<kv> KV, <warm|cold> TTFT, probe-only run]` appended to each note.
 - It deliberately does **not** emit `temp_c_max`, `vram_peak_gib`/`mem_peak_gib`,
   `power_w_*` or `tok_per_w`: those describe a whole cell, and a probe-only cell window has
   no bench heat soak, so its peak temperature and residency understate the full-sweep cell
@@ -121,8 +125,11 @@ What a probe-only run publishes, and why it is not a full sweep:
 - Because latest-wins is per metric, the streaming columns move to the new run while the
   bench, heat and memory columns keep pointing at the full sweep. Each rollup row carries
   its own `run_id`, so the provenance of every column is visible.
-- A probe-only pass is still a `--cells`-complete run (not `partial`), so it does update
-  the tracked rollup — that is the point. A `--cells` subset remains excluded (M-2).
+- A probe-only pass that covers the matrix is published; a `--cells` subset is stamped
+  `partial` and stays out (M-2). `run.json` is written with `partial: true` **before the
+  first cell** and cleared only when the last selected cell has written its `cell.json`, so
+  an interrupted sweep publishes nothing at all — the hole that let a crashed run's cells
+  become the "latest" values for seven columns (I2, 2026-10-24).
 
 **First use (2026-10-23):** the ten-cell f16 re-probe —
 `results/run-20261023-1140` (Vulkan) and `-1159` (ROCm), both `--kv f16 --probe-only` —
@@ -132,7 +139,64 @@ answered the TTFT protocol question and doubles as the run-to-run noise measurem
 table now come from these two runs, each row keeping its own `run_id`; the bench, power
 and memory columns stay attributed to the 2026-10-22 full sweeps.
 
-## 3c. Run the tests
+## 3c. The cold-request TTFT protocol
+
+`--ttft-protocol cold` (the default since 2026-10-24) makes every **timed** request start
+from an empty KV cache: `ttft_probe.py` calls `POST /slots/0?action=erase` before each
+one. The erase is untimed — it is setup, not latency — and `ttft.json` records
+`protocol` plus each request's `erased_tokens`, so the data shows what was dropped.
+
+The server must be started with `--slot-save-path` for the erasing
+`POST /slots/:id?action=erase` action to exist — that flag is what gates the action.
+`GET /slots` is gated separately on `--slots`, which this harness never passes, so a
+missing `--slots` is not the error you will see. `probe_cell()` adds
+`--slot-save-path` (pointed at `<cell_dir>/slots`) only in cold mode. Nothing is saved
+there — the flag only unlocks the action. `--kv` and the protocol are independent:
+the published runs are `f16` KV *and* cold.
+
+Why it exists, measured on three cells (3×512-token requests, f16 KV; the full ten-cell
+per-request table is in §7). Both sides of the comparison are tracked per request in
+[`results/ttft-per-request.csv`](../results/ttft-per-request.csv) — warm rows from
+`run-20261023-1140`/`-1159` (the column published until 2026-10-24), cold rows from
+`run-20261024-0910`/`-0930` — and `tests/test_ttft_extract.py` checks this table against
+that file, so it cannot be retyped from memory again:
+
+| cell | backend | warm per request (ms) | warm spread | cold per request (ms) | cold spread |
+|---|---|---|---|---|---|
+| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 55.3 / 53.4 / 55.6 | 2.2 |
+| `qwen3-4b-q8_0` | rocm | 23.4 / 31.2 / 24.8 | 7.8 | 43.5 / 43.5 / 43.0 | 0.5 |
+| `qwen3-32b-q5_k_m` | vulkan | 104.9 / 186.7 / 185.7 | 81.8 | 405.7 / 431.9 / 431.0 | 26.2 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 143.3 / 422.0 / 427.7 | 284.4 | 479.8 / 507.9 / 512.0 | 32.2 |
+
+`gen_tps` was unchanged on a clean pass — the ten-cell cold runs reproduce the warm runs'
+`server tg` within ±0.3% on Vulkan and ±0.4% mean on ROCm (one cell, gpt-oss on ROCm, −2.7%)
+— so the protocol changes only what TTFT measures. The cold number is **larger** than a warm
+first request because it includes the full prompt prefill: it is "time to first token for a
+fresh request", which is what a user sees, rather than "time to first token when the cache
+happens to hold the previous turn". `cache_prompt: false` was tried first and rejected: it
+re-prefills the prompt but still pays the previous generation's KV eviction, so it was both
+slower and just as noisy (27B: 480 / 511 / 702 ms).
+
+Cold is stable, not identical across models: the 27B Q6_K cell still takes 1.21 s to first
+token on Vulkan (0.36 s on ROCm) because prefilling the 46-token prompt on a 20 GiB dense
+model costs that much. And a contended pass shows it in `gen_tps` before TTFT — the 08:43
+Vulkan pass (`superseded-contended-20261024-0843`) read the 4B cell at 39.85 t/s against
+48.09 clean, while its p50 moved 0.5%.
+
+Reproduce a cold pass without re-running the bench phase:
+
+```
+/usr/bin/python3 scripts/run_sweep.py --backend vulkan --kv f16 --ttft-protocol cold --probe-only
+/usr/bin/python3 scripts/run_sweep.py --backend rocm   --kv f16 --ttft-protocol cold --probe-only
+```
+
+`--ttft-protocol warm` re-creates the pre-2026-10-24 column; the two protocols are
+different quantities and the rollup note says which one a row carries. The per-request
+values behind the published cold column are tracked in
+[`results/ttft-per-request.csv`](../results/ttft-per-request.csv), and
+`tests/test_ttft_extract.py` re-derives the rollup's mean/median from it.
+
+## 3d. Run the tests
 
 The harness has a small stdlib-`unittest` suite (no pytest dependency) covering the
 `llama-bench` table parser, `consolidate()` idempotency (no duplicate rows) and the
@@ -151,7 +215,8 @@ The harness has a small stdlib-`unittest` suite (no pytest dependency) covering 
 4. **`llama-bench`** — for each pp point (`-n 0`) plus one tg run (`-p 0 -n 512`), `-ngl 99
    -t 16 -r <repeats>`; output → `bench.log`. Runs at the **model-default context** (see §7).
 5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk <kv> -ctv <kv> -np 1 --alias <cell>`,
-   `--kv` defaulting to `q8_0`; the published 2026-10-22/23 runs used `f16`), waits on `/health` (timeout scales with model size:
+   `--kv` defaulting to `q8_0`; the published runs use `f16`), adding
+   `--slot-save-path <cell>/slots` for the cold TTFT protocol (§3c), waits on `/health` (timeout scales with model size:
    `900 + size_gib*15` s), then runs `ttft_probe.py`: 1 untimed warmup request, then `N`
    timed **streaming** 512-token completions (temperature 0, **`ignore_eos: true`**) →
    `ttft.json`. TTFT = time to first streamed token; gen_tps = tokens / (t_end − t_first),
@@ -171,6 +236,19 @@ After all cells: **rebuild** `results/consolidated.csv` and `results/table.md` f
 `run-*` directory (full rewrite, not append — so a Vulkan pass then a ROCm pass does not
 duplicate rows). The same rebuild is available standalone via `--consolidate`, for when a
 sweep is aborted or only some cells were selected.
+
+The driver cannot tell whether the tracked rollup in the worktree is the one those run dirs
+produce, so before committing run numbers check it:
+
+```
+/usr/bin/python3 scripts/run_sweep.py --check      # exit 1 on drift, names the rows
+```
+
+`--check` is deliberately local-only: it rebuilds the rollup in memory and diffs it against
+the tracked files, and raw `run-*` dirs are gitignored, so a CI checkout has nothing to
+compare (it says so and passes). This is the drift guard the README once claimed the test
+suite provided (review I5, 2026-10-24): the suite can only diff the README against the
+tracked CSV, which fires *after* a rebuild has already invalidated the README.
 
 ## 5. Where results land
 
@@ -255,11 +333,52 @@ so a stale figure cannot ship with fresh numbers.
   published cell has no residency row, so the dead counter cannot come back as a headline.
 - **`tok_per_w = server tg ÷ probe-window mean W`** — generation-phase efficiency, not a
   whole-run figure.
-- **TTFT is per-request state, not just latency: on Vulkan it includes KV-cache bookkeeping.**
-  Measured 2026-10-22 on the Qwen3.8-27B q5 cell (Vulkan, three 512-token requests, q8 KV): the
-  server logs a **1-token** prompt eval of ~785 ms and TTFT is 787 ms on the first request, then
-  1707 / 1706 ms — an extra ~905 ms that the server attributes to neither prefill nor decode.
-  Two single-variable runs isolate the trigger (values are TTFT / logged prompt-eval / difference):
+- **TTFT is now the cold-request protocol, and the number means "prefill a fresh request".**
+  Since 2026-10-24 both backends are measured with `--ttft-protocol cold`: the probe erases the
+  slot's KV cache before every timed request (§3c), so each request pays full prompt prefill +
+  first token from an empty cache and nothing else. The published column comes from
+  `run-20261024-0910` (Vulkan) and `run-20261024-0930` (ROCm), and every streaming row in the
+  rollup says which protocol it carries (`[<kv> KV, <warm|cold> TTFT]`).
+
+  Per-request values, clean Vulkan pass (3 × 512-token requests) — the same data,
+  both backends, is tracked in
+  [`results/ttft-per-request.csv`](../results/ttft-per-request.csv)
+  so a reader can check it without the gitignored run dirs:
+
+  | cell | warm p50 (pre-2026-10-24) | cold per request (ms) | cold p50 |
+  |---|---|---|---|
+  | qwen3-4b-q8_0 | 27.6 | 55.3 / 53.4 / 55.6 | 55.3 |
+  | poro2-8b-q8_0 | 42.3 | 127.4 / 127.9 / 128.7 | 127.9 |
+  | eurollm-9b-q8_0 | 48.3 | 139.1 / 141.2 / 140.9 | 140.9 |
+  | qwen3.8-27b-q5_k_xl | 422.0 | 479.8 / 507.9 / 512.0 | 507.9 |
+  | qwen3.8-27b-q6_k | 818.5 | 1161.3 / 1211.4 / 1212.4 | 1211.4 |
+  | qwen3-32b-q5_k_m | 185.7 | 405.7 / 431.9 / 431.0 | 431.0 |
+  | qwen3-coder-30b-a3b-q6_k | 44.0 | 181.5 / 179.6 / 179.5 | 179.6 |
+  | qwen3.5-35b-a3b-q6_k | 48.3 | 187.7 / 186.7 / 186.9 | 186.9 |
+  | poro2-70b-q4_k_m | 199.0 | 1146.6 / 1179.4 / 1181.3 | 1179.4 |
+  | gpt-oss-120b-mxfp4 | 116.5 | 368.7 / 370.3 / 391.1 | 370.3 |
+
+  It is a **larger** number than the warm column it replaced (+20…+493% on Vulkan, +58…+397% on
+  ROCm) because a warm request re-used the prompt cache and evaluated one token, while a cold
+  request prefills all 46. That is the trade for stability: across the 20 cell/backend pairs the
+  warm column's median per-request spread was 53 ms (max 823 ms, `ttft_ms`/`p50` up to 2.11),
+  cold is 3 ms median (max 51 ms, ratio ≤ 1.04). Two Vulkan cold passes agree on `p50` within
+  **−1.2…+2.1%**, and `tg_server_tps` moved ≤0.3% per cell on Vulkan (≤0.4% mean on ROCm) between
+  the cold and warm passes — the erase changes what TTFT measures and nothing else.
+
+  What it does not fix is model-specific prefill cost: cold, the 27B Q6_K cell still takes
+  **1.21 s** on Vulkan (0.36 s on ROCm) and the 70B 1.18 s (0.55 s), because prefilling 46 tokens
+  on a 20–40 GiB dense model is genuinely that slow. Contention shows up in `server tg` first: the
+  08:43 Vulkan pass (kept as `superseded-contended-20261024-0843`) read the 4B cell at 39.85 t/s
+  and Q6_K at 8.91 t/s against 48.09 and 9.91 in the clean pass, while their p50 moved by 0.5%
+  and 0.3%. The driver cannot detect another process taking the GPU — check `temp_c_max` and the
+  per-request decode rates in `ttft.json` when a cell looks slow.
+
+  **History — why the warm column was unusable.** Measured 2026-10-22 on the Qwen3.8-27B q5 cell
+  (Vulkan, three 512-token requests, q8 KV): the server logs a **1-token** prompt eval of ~785 ms
+  and TTFT is 787 ms on the first request, then 1707 / 1706 ms — an extra ~905 ms that the server
+  attributes to neither prefill nor decode. Two single-variable runs isolate the trigger (values
+  are TTFT / logged prompt-eval / difference):
 
   | condition | TTFT (3 requests) | prompt eval | TTFT − prompt eval |
   |---|---|---|---|
@@ -267,32 +386,15 @@ so a stale figure cannot ship with fresh numbers.
   | 32-token generations, q8 KV | 813 / 804 / 785 ms | 811 / 802 / 783 ms | 2 / 2 / 2 ms |
   | 512-token generations, f16 KV | 141 / 417 / 417 ms | 139 / 134 / 133 ms | 2 / 284 / 284 ms |
 
-  So (a) the stall needs a **long preceding generation** — the prompt itself is not the trigger, it is
-  the KV trim/rollback that follows 512 generated tokens; and (b) **quantised KV is ~85% of the
-  cost** on this cell (base 790 → 135 ms, stall 905 → 284 ms), while generation rate is identical in
-  every arm (10.46–10.52 tok/s). The same q8→f16 swap on the 32B cell changes nothing (overhead
-  73 → 76 ms), so this is a **model-specific** cost, not a general Vulkan penalty. ROCm stays flat
-  (2–73 ms) on the same cells.
-
-  **Consequence:** `ttft_ms` (mean) and `ttft_ms_p50` (median) mix prompt prefill with per-request KV
-  work. Do not compare them across cells or backends, and any future TTFT measurement must state its
-  KV type. Per-request values are in `ttft.json`. This supersedes the 2026-10-02 note that described
-  "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
-  Re-measuring the column for one KV type is what `--probe-only` exists for (§3b); pass `--kv`
-  explicitly so the run's `run.json` states the protocol it used.
-
-  **The published column is f16 KV, and a ten-cell re-probe confirms it (2026-10-23).** Both
-  2026-10-22 sweeps ran with `--kv f16` — `sweep.log` records the argv and `run.json` stamps
-  `kv_cache: f16` — so the q8 arm above was a single-variable experiment, never the published
-  protocol. The probe-only pass (`run-20261023-1140` Vulkan, `run-20261023-1159` ROCm, both
-  `--kv f16 --probe-only`, same kernel/Mesa/llama.cpp) re-measured all ten cells and reproduced
-  the column instead of moving it: `tg_server_tps` within **−0.2…+1.4%** (mean |Δ| 0.18%),
-  `ttft_ms` mean within **−4.4…+6.5%** and `ttft_ms_p50` within **−5.9…+8.1%** (mean |Δ| 1.7% /
-  2.0%), over 20 cell/backend pairs. Two conclusions: the TTFT column needs no protocol change,
-  and the ~2% noise floor the README quotes is now measured rather than assumed. What f16 does
-  not remove is the stall itself — the 27B Q6_K cell measures 818 / 1641 / 818 ms, a ~0.8 s
-  middle request — so the mean stays inflated on that cell and the median remains the figure to
-  quote. A cold-request protocol is the remaining option and has not been run.
+  So (a) the stall needed a **long preceding generation** — the prompt itself is not the trigger, it
+  is the KV trim/rollback that follows 512 generated tokens; and (b) **quantised KV was ~85% of the
+  cost** on this cell (base 790 → 135 ms, stall 905 → 284 ms), while generation rate was identical
+  in every arm (10.46–10.52 tok/s). The same q8→f16 swap on the 32B cell changed nothing (overhead
+  73 → 76 ms), so it was a **model-specific** cost, not a general Vulkan penalty. Those runs produced
+  the `warm` column, which stays in the rollup under its own run ids (`run-20261022-*`,
+  `run-20261023-*`) and can be reproduced with `--ttft-protocol warm`; it is not published. This
+  supersedes the 2026-10-02 note that described "first request fast, next two slow": the
+  discriminator is the preceding generation, not the prompt.
 - **Numbers are stack-stamped, and the published tables were re-measured.** The tracked
   tables now come from the 2026-10-22 sweeps: kernel 7.2.10 / Mesa 26.2.4 (`docs/env.md`).
   The 2026-10-02/03 rows were measured on kernel 7.2.8 / Mesa 26.2.3 and stay in the rollup

@@ -30,7 +30,8 @@ jobs:
 
       - name: Run the test suite
         # Pins the README numbers to the tracked rollups, checks the chart
-        # fingerprints, and reproduces consolidated.csv from the run data.
+        # fingerprints, and fails when the rollup mixes TTFT protocols across
+        # backends. It cannot rebuild the rollup: raw run dirs are gitignored.
         # The scorer golden tests skip here: tools/score_ll and the fixture
         # GGUF are not in git (see docs/RUNNING.md §9).
         run: python -m unittest discover -s tests -t . -v

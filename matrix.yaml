@@ -16,6 +16,11 @@ defaults:
   tg_tokens: 512                  # generation length (README: 512-token outputs)
   repeats: 3
   warmup_requests: 1              # TTFT probe: discard first timed request
+  ttft_protocol: cold             # cold = erase the KV cache before every timed
+                                  # request (published since 2026-10-24); warm =
+                                  # prompt-cache reuse, the pre-2026-10-24 protocol
+  kv: f16                         # -ctk/-ctv for the server phase; f16 is the
+                                  # published protocol (D9), q8_0 the pre-2026-10-22 one
   power_sample_hz: 5
 
 cells:

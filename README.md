@@ -129,37 +129,37 @@ run-parameter defaults: [matrix.yaml](matrix.yaml).
 Both backends, every cell, rendered from the tracked rollup
 [results/consolidated.csv](results/consolidated.csv). Rows are ordered by model
 size; `server tg` is the sustained 512-token stream from `llama-server`, and
-`TTFT p50` is the median of three streaming requests measured with an **f16 KV
-cache**. Columns come from two passes on the same stack, each row carrying its
-own run id in the rollup: `pp2048`, `tg512`, `tok/s/W` and `peak GPU` from the
-2026-10-22 full sweeps, `server tg` and `TTFT p50` from the 2026-10-23 probe
-pass that re-measured the server phase alone
-([why](docs/RUNNING.md#3b-re-measuring-one-phase---probe-only)). Full per-cell
-detail — power, temperature, per-request TTFT, benchmark context — is in
+`TTFT p50` is the median first-token latency of three streaming requests, each
+one starting from an **erased KV cache** (the cold-request protocol). Columns come
+from two passes on the same stack, each row carrying its own run id in the
+rollup: `pp2048`, `tg512`, `tok/s/W` and `peak GPU` from the 2026-10-22 full
+sweeps, `server tg` and `TTFT p50` from the 2026-10-24 cold re-measure
+([why](docs/RUNNING.md#3c-the-cold-request-ttft-protocol)). Full per-cell detail —
+power, temperature, per-request TTFT, benchmark context — is in
 [results/table.md](results/table.md).
 
 | Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | peak GPU GiB |
 |---|---|---|---|---|---|---|---|
-| `qwen3-4b-q8_0` | vulkan | 1857.9 | 48.89 | 48.12 | 27.6 | 0.57 | 5.77 |
-| `qwen3-4b-q8_0` | rocm | 2329.5 | 46.83 | 46.29 | 24.8 | 0.54 | 5.53 |
-| `poro2-8b-q8_0` | vulkan | 918.4 | 27.16 | 26.82 | 42.3 | 0.32 | 9.26 |
-| `poro2-8b-q8_0` | rocm | 1239.1 | 26.59 | 26.41 | 40.7 | 0.31 | 8.89 |
-| `eurollm-9b-q8_0` | vulkan | 791.0 | 23.57 | 23.32 | 48.3 | 0.27 | 10.67 |
-| `eurollm-9b-q8_0` | rocm | 1060.1 | 22.91 | 22.93 | 46.2 | 0.27 | 10.30 |
-| `qwen3.8-27b-q5_k_xl` | vulkan | 290.3 | 10.56 | 10.51 | 422.0 | 0.12 | 20.09 |
-| `qwen3.8-27b-q5_k_xl` | rocm | 308.4 | 10.37 | 10.33 | 140.4 | 0.12 | 19.59 |
-| `qwen3.8-27b-q6_k` | vulkan | 273.7 | 9.98 | 9.92 | 818.5 | 0.12 | 21.13 |
-| `qwen3.8-27b-q6_k` | rocm | 308.6 | 9.83 | 9.81 | 143.6 | 0.12 | 20.53 |
-| `qwen3-32b-q5_k_m` | vulkan | 243.1 | 9.71 | 9.66 | 185.7 | 0.11 | 24.01 |
-| `qwen3-32b-q5_k_m` | rocm | 292.9 | 9.54 | 9.52 | 110.9 | 0.11 | 23.68 |
-| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1110.0 | 74.86 | 73.56 | 44.0 | 0.90 | 24.39 |
-| `qwen3-coder-30b-a3b-q6_k` | rocm | 1246.9 | 61.41 | 59.87 | 21.4 | 0.69 | 24.37 |
-| `qwen3.5-35b-a3b-q6_k` | vulkan | 1062.4 | 62.30 | 60.98 | 48.3 | 0.80 | 27.63 |
-| `qwen3.5-35b-a3b-q6_k` | rocm | 1054.7 | 51.32 | 50.62 | 77.2 | 0.59 | 27.40 |
-| `poro2-70b-q4_k_m` | vulkan | 81.0 | 5.25 | 5.25 | 199.0 | 0.06 | 42.52 |
-| `poro2-70b-q4_k_m` | rocm | 127.1 | 5.18 | 5.18 | 196.7 | 0.06 | 42.15 |
-| `gpt-oss-120b-mxfp4` | vulkan | 735.3 | 55.30 | 54.16 | 116.5 | 0.63 | 59.70 |
-| `gpt-oss-120b-mxfp4` | rocm | 882.6 | 50.91 | 50.21 | 74.9 | 0.59 | 59.31 |
+| `qwen3-4b-q8_0` | vulkan | 1857.9 | 48.89 | 48.09 | 55.3 | 0.57 | 5.77 |
+| `qwen3-4b-q8_0` | rocm | 2329.5 | 46.83 | 46.23 | 43.5 | 0.54 | 5.53 |
+| `poro2-8b-q8_0` | vulkan | 918.4 | 27.16 | 26.83 | 127.9 | 0.32 | 9.26 |
+| `poro2-8b-q8_0` | rocm | 1239.1 | 26.59 | 26.48 | 64.4 | 0.31 | 8.89 |
+| `eurollm-9b-q8_0` | vulkan | 791.0 | 23.57 | 23.25 | 140.9 | 0.27 | 10.67 |
+| `eurollm-9b-q8_0` | rocm | 1060.1 | 22.91 | 22.90 | 85.3 | 0.27 | 10.30 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 290.3 | 10.56 | 10.48 | 507.9 | 0.12 | 20.09 |
+| `qwen3.8-27b-q5_k_xl` | rocm | 308.4 | 10.37 | 10.33 | 338.1 | 0.12 | 19.59 |
+| `qwen3.8-27b-q6_k` | vulkan | 273.7 | 9.98 | 9.91 | 1211.4 | 0.12 | 21.13 |
+| `qwen3.8-27b-q6_k` | rocm | 308.6 | 9.83 | 9.80 | 358.1 | 0.12 | 20.53 |
+| `qwen3-32b-q5_k_m` | vulkan | 243.1 | 9.71 | 9.66 | 431.0 | 0.11 | 24.01 |
+| `qwen3-32b-q5_k_m` | rocm | 292.9 | 9.54 | 9.51 | 225.0 | 0.11 | 23.68 |
+| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1110.0 | 74.86 | 73.55 | 179.6 | 0.90 | 24.39 |
+| `qwen3-coder-30b-a3b-q6_k` | rocm | 1246.9 | 61.41 | 60.05 | 106.4 | 0.69 | 24.37 |
+| `qwen3.5-35b-a3b-q6_k` | vulkan | 1062.4 | 62.30 | 61.12 | 186.9 | 0.80 | 27.63 |
+| `qwen3.5-35b-a3b-q6_k` | rocm | 1054.7 | 51.32 | 50.53 | 129.2 | 0.59 | 27.40 |
+| `poro2-70b-q4_k_m` | vulkan | 81.0 | 5.25 | 5.24 | 1179.4 | 0.06 | 42.52 |
+| `poro2-70b-q4_k_m` | rocm | 127.1 | 5.18 | 5.18 | 545.4 | 0.06 | 42.15 |
+| `gpt-oss-120b-mxfp4` | vulkan | 735.3 | 55.30 | 54.02 | 370.3 | 0.63 | 59.70 |
+| `gpt-oss-120b-mxfp4` | rocm | 882.6 | 50.91 | 48.88 | 218.9 | 0.59 | 59.31 |
 
 **Vulkan leads `tg512` on 10 of 10 cells — decisively on 6 (by 2.1–18.0%), with
 4 ties — and ROCm leads `pp2048` on 9 of 10 (by 6.2–56.8%), with 1 tie.**
@@ -198,15 +198,17 @@ logged per run.
 > only, which is why the older tables' 59 GiB cell read as 0.87 GiB. See
 > [docs/RUNNING.md](docs/RUNNING.md) §7.
 
-> **The TTFT column is not a like-for-like latency figure — read
-> [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it.** The protocol is an
-> **f16 KV cache** (stated here because the number is meaningless without it), and on
-> Vulkan a request that follows a long generation still pays KV-cache bookkeeping: the
-> Qwen3.8-27B Q6_K cell measures 818 / 1641 / 818 ms across its three requests, so its
-> median is the honest figure and its mean is inflated. The same cache work cost ~0.9 s
-> per request with q8 KV before the protocol was f16 — but f16 shrinks that stall, it
-> does not remove it. Medians are reported and per-request values are in
-> `results/table.md`; do not compare TTFT across cells or backends in this table.
+> **What the TTFT column measures (read
+> [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it).** Each timed request starts
+> from an **erased KV cache**, so the number is full prompt prefill + first token for a
+> fresh request — not first-token latency with the previous turn still cached. It is
+> therefore *larger* than a warm-cache figure (20–493% above the pre-2026-10-24 warm
+> column on Vulkan, 58–397% on ROCm) and it is the same quantity on both backends. It
+> also removes the request-to-request spread that made the old column volatile: the
+> mean/p50 ratio fell from up to 2.11 to at most 1.04, and the median per-request spread
+> from 53 ms to 3 ms. The residual spread is model-specific — the 27B Q6_K cell still
+> takes 1.2 s to first token on Vulkan (spread 51 ms), and the 70B 1.18 s — because a
+> long prompt on a dense 20–40 GiB model is genuinely slow to prefill.
 
 ## Charts
 
@@ -360,18 +362,31 @@ What is pinned, and where:
   both context sizes and the real repeat counts in `run.json`.
 - **Raw run directories** (`results/run-*/`) are gitignored: large and
   machine-specific. The rollups (`results/consolidated.csv`, `results/table.md`,
-  `results/finbench-consolidated.csv`, `results/finbench-table.md`) are tracked,
-  and the suite rebuilds them from the per-run data to catch drift.
+  `results/finbench-consolidated.csv`, `results/finbench-table.md`) are tracked.
+  The suite cannot rebuild them from the run data (it does not have it on CI) —
+  it diffs the README against the tracked CSV, so a value that drifts from the
+  rollup fails. Rebuilding needs the run directories, i.e. the machine that
+  measured them (`--consolidate`), and so does the drift guard that checks the
+  tracked rollup still matches them (`--check`, exit 1 and the offending rows when
+  it does not).
 - **Published numbers are tested.** The percentages in this README are
-  recomputed from the rollup by `tests/test_readme_ranges.py`, and the results
+  recomputed from the rollup by `tests/test_readme_ranges.py`, the results
   and FIN-bench tables are diffed against the rollups by
-  `tests/test_readme_tables.py`. CI runs both on every pull request.
+  `tests/test_readme_tables.py`, and `results/consolidated.csv` must carry one
+  KV type and one TTFT protocol per cell across both backends
+  (`tests/test_rollup_protocol_consistency.py`). The TTFT column's per-request data
+  for **both** protocols is tracked in `results/ttft-per-request.csv` and
+  re-derived from it (`tests/test_ttft_extract.py`), which also checks the
+  per-request table in `docs/RUNNING.md` §3c against the extract — so the latency
+  argument is checkable without the gitignored run directories. CI runs them on
+  every pull request.
 
 ## Repository layout
 
 | Path | What |
 |---|---|
 | `scripts/run_sweep.py` | the sweep driver (stdlib + PyYAML) |
+| `scripts/download_models.sh` | one-time fetch of the GGUF files in `matrix.yaml` (nothing downloads during a run) |
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib helpers: power/VRAM trace, TTFT probe |
 | `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML + Jinja2) |
 | `scripts/fetch_finbench_upstream.py` | refreshes the vendored upstream prompt templates |
@@ -383,7 +398,7 @@ What is pinned, and where:
 | `docs/RUNNING.md` | operator guide: prerequisites, per-cell behaviour, caveats |
 | `docs/env.md` | machine fingerprint at measurement time |
 | `docs/reviews/` | independent reviews, with resolution notes |
-| `results/` | tracked rollups; raw run directories are gitignored |
+| `results/` | tracked rollups and the TTFT per-request extract; raw run directories are gitignored |
 | `charts/` | generated figures, fingerprinted against the rollup |
 | `tests/` | unittest suite: parser/rollup, FIN-bench transforms, README tables and ranges, charts, scorer golden |
 | `PLAN.md` | methodology decisions and the reasoning behind them |
@@ -399,28 +414,35 @@ What is pinned, and where:
 - **Two contexts.** `llama-bench` runs at the model-default context (4096) and
   `llama-server` at 8192. Do not compare a bench number to a server number as if
   they were measured at the same context.
-- **TTFT mixes prefill with per-request KV work on Vulkan**, and its protocol is an
-  **f16 KV cache**. A request that follows a long generation pays KV-cache
-  bookkeeping: with q8 KV the Qwen3.8-27B cell paid ~0.79 s per request plus ~0.9 s
-  after every 512-token generation; f16 KV shrinks that to ~0.14 s and ~0.28 s. The
-  published column is f16, and the residual stall is still visible — the 27B Q6_K cell
-  measures 818 / 1641 / 818 ms, so its median and mean diverge. The 32B cell shows no
-  q8-vs-f16 difference at all, so the column remains incomparable across cells and
-  backends.
+- **TTFT measures a cold request, and that is a different number from a warm one.**
+  Every timed request starts from an erased KV cache (both backends), so the column is
+  full prompt prefill + first token: 20–493% above the pre-2026-10-24 warm column on
+  Vulkan and 58–397% on ROCm. That is why it is stable (mean/p50 ≤ 1.04, median spread
+  3 ms) where the warm column was not (mean/p50 up to 2.11, spread up to 823 ms): the
+  KV bookkeeping that used to land inside TTFT after a 512-token generation is now paid
+  by an untimed erase. It does not make the cells equal — the 27B Q6_K cell is 1.21 s on
+  Vulkan against 0.36 s on ROCm, both cold, because prefill speed differs — and the
+  27B/70B cells stay above a second even cold. Any TTFT figure quoted from this repo
+  must name the protocol; the rollup labels every streaming row
+  `[<kv> KV, <warm|cold> TTFT]`.
 - **Numbers are stack-stamped, and the tables were re-measured.** Every column in
   the table above comes from kernel 7.2.10 / Mesa 26.2.4 / ROCm 7.2.4: the
   throughput, efficiency and memory columns from the 2026-10-22 sweeps, the
-  `server tg`/`TTFT` columns from the 2026-10-23 probe re-measure on the same stack.
+  `server tg`/`TTFT` columns from the 2026-10-24 cold re-measure on the same stack.
   The earlier 2026-10-02/03 rows (kernel 7.2.8 / Mesa
   26.2.3) stay in the rollup under their own run ids; measured against them over
   all 20 cell/backend pairs, `pp2048` is 2.6–31.3% lower on the current stack and
   `tg512` stays inside −2.8…+0.9%. Never mix rows from two stacks in one
   comparison.
 - **No error bars.** Three repeats catch a broken run; they do not support a 1%
-  claim. That band is measured, not assumed: a ten-cell re-probe of the same protocol
-  on the same stack moved `server tg` by −0.2…+1.4% (mean |Δ| 0.18%) and `TTFT p50` by
-  −5.9…+8.1% (mean |Δ| 2.0%). Differences under ~2% are within noise for this setup —
-  and per-request latency is noisier than throughput.
+  claim. The band is measured, not assumed. Throughput: a ten-cell warm re-probe moved
+  `server tg` by −0.2…+1.4% (mean |Δ| 0.18%); the cold pass reproduced the same
+  `server tg` within ±0.3% on Vulkan and ±0.4% mean on ROCm (one cell, gpt-oss on ROCm,
+  at −2.7%). Latency: two Vulkan cold passes agree on `TTFT p50` within −1.2…+2.1%, and
+  ROCm has a single cold pass. Differences under ~2% are within noise for this setup.
+  Contention shows up in `server tg` first (a contended pass read the 4B cell 17% low
+  while its TTFT p50 moved 0.5%) — the driver cannot tell you another process grabbed
+  the GPU.
 - **FIN-bench is one comparable formulation.** `cf` at prompt variant `p0`
   only. `mcf`/`p0` exists for a single cell as a documented negative result —
   it is not a like-for-like scale — and `p1`–`p4` are unmeasured; formulation
@@ -471,12 +493,10 @@ metadata is in [CITATION.cff](CITATION.cff):
 - **An English/general quality axis** — strict-JSON extraction, function
   calling, and a GSM8K-style math subset over the same cells.
 - **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.
-- **Cold-request TTFT protocol** — the KV-type question is settled: the published
-  column is f16 KV, a ten-cell re-probe on 2026-10-23 reproduced it within
-  −5.9…+8.1% (`docs/RUNNING.md` §7). What is still mixed into the number is the KV
-  trim that follows each 512-token generation, which f16 shrinks but does not remove
-  on the 27B cells. A cold-request protocol would isolate pure latency; it has not
-  been run.
+- **A warm-cache TTFT column is not published** — the cold-request protocol replaced
+  it on 2026-10-24 (both backends, `docs/RUNNING.md` §3c). What a repeat would add is a
+  second cold pass on ROCm: the latency noise band is measured on Vulkan only
+  (−1.2…+2.1% across two passes), so the ROCm medians are single-pass.
 - **Wider matrix.** One-time downloads, not yet swept: gpt-oss-20b (MXFP4),
   Qwen3-30B-A3B (Q4_K_M), Llama 3.1 8B (Q8_0), Mistral Small 3.2 24B (Q4_K_M),
   Gemma 3 27B (Q4_K_M), Llama 3.3 70B (Q4_K_M).

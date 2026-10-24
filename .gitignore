@@ -25,3 +25,4 @@ __pycache__/
 !results/bench-logs/**/*.log
 .DS_Store
 .pytest_cache/
+results/embed-*/

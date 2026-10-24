@@ -1,0 +1,251 @@
+{
+ "set": "fi-2026-10",
+ "builder": "hand-authored (see PLAN.md D11); qrels derived from the answer string",
+ "label_rule": "relevant = the passage contains the query's answer string, case-insensitive; tests/test_retrieval_set.py re-derives every qrels list from this rule",
+ "passages": "docs/retrieval/fi-2026-10/corpus.jsonl (Finnish Wikipedia, CC BY-SA 4.0)",
+ "queries": [
+  {
+   "id": "q01",
+   "query": "Milloin arvonlisävero otettiin Suomessa käyttöön?",
+   "answer": "1. kesäkuuta 1994",
+   "qrels": [
+    "arvonlisavero#006"
+   ]
+  },
+  {
+   "id": "q02",
+   "query": "Minkä veron arvonlisävero korvasi Suomessa?",
+   "answer": "liikevaihtoveron",
+   "qrels": [
+    "arvonlisavero#001"
+   ]
+  },
+  {
+   "id": "q03",
+   "query": "Kuka esitti idean arvonlisäverosta?",
+   "answer": "Maurice Lauré",
+   "qrels": [
+    "arvonlisavero#000"
+   ]
+  },
+  {
+   "id": "q04",
+   "query": "Mistä lähtien Suomen yleinen arvonlisäveroprosentti on ollut 25,5?",
+   "answer": "vuoden 2024 syyskuusta 25,5",
+   "qrels": [
+    "arvonlisavero#001"
+   ]
+  },
+  {
+   "id": "q05",
+   "query": "Mitä hyödykkeitä alennettu 13,5 prosentin verokanta koskee?",
+   "answer": "13,5 %: elintarvikkeet",
+   "qrels": [
+    "arvonlisavero#006"
+   ]
+  },
+  {
+   "id": "q06",
+   "query": "Kuinka pitkä työsopimuksen koeaika voi enintään olla?",
+   "answer": "kuusi kuukautta tai puolet",
+   "qrels": [
+    "tyosopimus#009"
+   ]
+  },
+  {
+   "id": "q07",
+   "query": "Kuinka suuri lomaraha on vuosilomapalkasta?",
+   "answer": "50 % vuosilomapalkasta",
+   "qrels": [
+    "lomaraha#001"
+   ]
+  },
+  {
+   "id": "q08",
+   "query": "Kuka toimittaa ennakonpidätyksen palkasta?",
+   "answer": "Ennakonpidätyksen palkasta tekee työnantaja",
+   "qrels": [
+    "ennakonpidatys#002"
+   ]
+  },
+  {
+   "id": "q09",
+   "query": "Mitä kuitti on?",
+   "answer": "vapaamuotoinen kirjallinen",
+   "qrels": [
+    "kuitti#000"
+   ]
+  },
+  {
+   "id": "q10",
+   "query": "Milloin käteiskaupasta tuli pakollista tarjota kuitti asiakkaalle?",
+   "answer": "vuoden 2014 alusta",
+   "qrels": [
+    "kuitti#001"
+   ]
+  },
+  {
+   "id": "q11",
+   "query": "Mitä perintä tarkoittaa?",
+   "answer": "saada velallinen vapaaehtoisesti maksamaan",
+   "qrels": [
+    "perinta#000"
+   ]
+  },
+  {
+   "id": "q12",
+   "query": "Mitä sähköinen allekirjoitus on?",
+   "answer": "julkiseen avaimeen perustuva allekirjoitus",
+   "qrels": [
+    "sahkoinen-allekirjoitus#000"
+   ]
+  },
+  {
+   "id": "q13",
+   "query": "Mikä EU-asetus on yleinen tietosuoja-asetus?",
+   "answer": "2016/679",
+   "qrels": [
+    "yleinen-tietosuoja-asetus#000"
+   ]
+  },
+  {
+   "id": "q14",
+   "query": "Mitä tilintarkastus tarkoittaa?",
+   "answer": "hallinnon tarkastamista",
+   "qrels": [
+    "tilintarkastus#000"
+   ]
+  },
+  {
+   "id": "q15",
+   "query": "Mitä tilinpäätökseen kuuluu taseen ja tuloslaskelman lisäksi?",
+   "answer": "liitetiedot",
+   "qrels": [
+    "tilinpaatos#002",
+    "tilinpaatos#014"
+   ]
+  },
+  {
+   "id": "q16",
+   "query": "Mitä toiminimi tarkoittaa?",
+   "answer": "nimeä, jota yhtiö",
+   "qrels": [
+    "toiminimi#000"
+   ]
+  },
+  {
+   "id": "q17",
+   "query": "Mitä työeläke on?",
+   "answer": "eläkettä, jota maksetaan ansiotyössä",
+   "qrels": [
+    "tyoelake#000"
+   ]
+  },
+  {
+   "id": "q18",
+   "query": "Mikä on YEL-työtulon vähimmäismäärä vuonna 2025?",
+   "answer": "9 208,43",
+   "qrels": [
+    "tyoelake#031"
+   ]
+  },
+  {
+   "id": "q19",
+   "query": "Mitä työturvallisuus on?",
+   "answer": "oma-aloitteista turvallisuuden hallintaa",
+   "qrels": [
+    "tyoturvallisuus#000"
+   ]
+  },
+  {
+   "id": "q20",
+   "query": "Mitä vahingonkorvauslaissa määritellään?",
+   "answer": "vahingonkorvauksen määrä ja syyt",
+   "qrels": [
+    "vahingonkorvaus#001"
+   ]
+  },
+  {
+   "id": "q21",
+   "query": "Mitä kirjanpito on?",
+   "answer": "tietojärjestelmä, jossa ylläpidetään",
+   "qrels": [
+    "kirjanpito#000"
+   ]
+  },
+  {
+   "id": "q22",
+   "query": "Ketkä ovat kirjanpitovelvollisia Suomessa?",
+   "answer": "kirjanpitovelvollinen harjoittamastaan liike",
+   "qrels": [
+    "kirjanpito#007"
+   ]
+  },
+  {
+   "id": "q23",
+   "query": "Mitä kassavirtalaskenta kuvaa?",
+   "answer": "Kassavirtalaskenta on käytössä kaikkialla maailmassa",
+   "qrels": [
+    "kassavirta#001"
+   ]
+  },
+  {
+   "id": "q24",
+   "query": "Missä valtion talousarvioesitys hyväksytään?",
+   "answer": "Budjettiriihessä hallitus hyväksyy",
+   "qrels": [
+    "talousarvio#003"
+   ]
+  },
+  {
+   "id": "q25",
+   "query": "Mitä palkka on?",
+   "answer": "tyypillisesti rahallinen korvaus",
+   "qrels": [
+    "palkka#000"
+   ]
+  },
+  {
+   "id": "q26",
+   "query": "Kuka on yrittäjä?",
+   "answer": "organisoi liiketoimintaa",
+   "qrels": [
+    "yrittaja#000"
+   ]
+  },
+  {
+   "id": "q27",
+   "query": "Voiko sopimuksen tehdä suullisesti?",
+   "answer": "Sopimus voidaan tehdä suullisesti",
+   "qrels": [
+    "sopimus#001"
+   ]
+  },
+  {
+   "id": "q28",
+   "query": "Mitä lasku sisältää?",
+   "answer": "tosite tai ilmoitus",
+   "qrels": [
+    "lasku#000"
+   ]
+  },
+  {
+   "id": "q29",
+   "query": "Mitä yhtiömuotoja toiminimen yhteydessä luetellaan?",
+   "answer": "Julkinen osakeyhtiö",
+   "qrels": [
+    "toiminimi#007"
+   ]
+  },
+  {
+   "id": "q30",
+   "query": "Mitä osakeyhtiö on?",
+   "answer": "Osakeyhtiö on",
+   "qrels": [
+    "osakeyhtio#000",
+    "osakeyhtio#005",
+    "osakeyhtio#008"
+   ]
+  }
+ ]
+}

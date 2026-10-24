@@ -1,0 +1,182 @@
+{
+ "articles": [
+  {
+   "chars": 18822,
+   "passages": 32,
+   "sha256": "ac6b396600aa124a57d568981b84dace09f379c1b7096a58ef1ec2699d566029",
+   "title": "Arvonlisävero",
+   "url": "https://fi.wikipedia.org/wiki/Arvonlis%C3%A4vero"
+  },
+  {
+   "chars": 1961,
+   "passages": 6,
+   "sha256": "ff0316c99652f6066e31d26848c6ecfdf0fd9f5321615d0f1d3dbab2377ef7ff",
+   "title": "Ennakonpidätys",
+   "url": "https://fi.wikipedia.org/wiki/Ennakonpid%C3%A4tys"
+  },
+  {
+   "chars": 7821,
+   "passages": 9,
+   "sha256": "790e00fad902d029015343690b60f41983a23413a01653dee13f8cb3370bb5ad",
+   "title": "Kassavirta",
+   "url": "https://fi.wikipedia.org/wiki/Kassavirta"
+  },
+  {
+   "chars": 5469,
+   "passages": 10,
+   "sha256": "b238e35f6e0f71888d95710559af986da9895b5e6ba6ce38b8c08c6562fe5b92",
+   "title": "Kirjanpito",
+   "url": "https://fi.wikipedia.org/wiki/Kirjanpito"
+  },
+  {
+   "chars": 2372,
+   "passages": 5,
+   "sha256": "6c310af030543b1e8d5fbf12899b1e85a515a022a097512d5d745e29cf6fc515",
+   "title": "Kuitti",
+   "url": "https://fi.wikipedia.org/wiki/Kuitti"
+  },
+  {
+   "chars": 2278,
+   "passages": 4,
+   "sha256": "22bb782d1f0a509ea97017c0fdfb79e1ffea30ddd3af58ea6687ece7377867c8",
+   "title": "Lasku",
+   "url": "https://fi.wikipedia.org/wiki/Lasku"
+  },
+  {
+   "chars": 1759,
+   "passages": 3,
+   "sha256": "86ce73c31815a7427ab8a28cfff945aecaf7ba17f4c0584a748aeca3806106fb",
+   "title": "Lomaraha",
+   "url": "https://fi.wikipedia.org/wiki/Lomaraha"
+  },
+  {
+   "chars": 6473,
+   "passages": 11,
+   "sha256": "dcf5afc37c63e1dd4f8ed0cb56819adb5cc99e762b2075604bfe66e59c9c82fc",
+   "title": "Osakeyhtiö",
+   "url": "https://fi.wikipedia.org/wiki/Osakeyhti%C3%B6"
+  },
+  {
+   "chars": 4895,
+   "passages": 9,
+   "sha256": "1f3b7c1ee8a40094523daeaddfe6761d8f12c45ba667dbbf43e9955e2a40cde6",
+   "title": "Palkka",
+   "url": "https://fi.wikipedia.org/wiki/Palkka"
+  },
+  {
+   "chars": 1051,
+   "passages": 2,
+   "sha256": "c71f8c174b3cc04fd54c5a1c916b36ffc77b59a888c9dac8a763c273acebe9b8",
+   "title": "Perintä",
+   "url": "https://fi.wikipedia.org/wiki/Perint%C3%A4"
+  },
+  {
+   "chars": 2655,
+   "passages": 6,
+   "sha256": "ec2f731d569dfe377a5db36fb78e91d975bf6b4c00485f812027ba319c165f00",
+   "title": "Sopimus",
+   "url": "https://fi.wikipedia.org/wiki/Sopimus"
+  },
+  {
+   "chars": 7327,
+   "passages": 15,
+   "sha256": "4fa8c9169ab3e960b1d54c10e6f80a70fc02e5e6ead64bdc69b95cccdc4bd329",
+   "title": "Sähköinen allekirjoitus",
+   "url": "https://fi.wikipedia.org/wiki/S%C3%A4hk%C3%B6inen_allekirjoitus"
+  },
+  {
+   "chars": 2260,
+   "passages": 5,
+   "sha256": "9564ab787fd8c7f0aff7f948e62136613892198ab24fffbe0e3d07524a91c33a",
+   "title": "Talousarvio",
+   "url": "https://fi.wikipedia.org/wiki/Talousarvio"
+  },
+  {
+   "chars": 4678,
+   "passages": 10,
+   "sha256": "fbd19392f923da0962bac99e910058b6befa3d32a3ce2da1fc8d441c232eb9f8",
+   "title": "Tietosuoja",
+   "url": "https://fi.wikipedia.org/wiki/Tietosuoja"
+  },
+  {
+   "chars": 13557,
+   "passages": 24,
+   "sha256": "4975550ebda199ba8c4e7ef10328f1fe1135d50354ee38fb4c8809fc19e6e850",
+   "title": "Tilinpäätös",
+   "url": "https://fi.wikipedia.org/wiki/Tilinp%C3%A4%C3%A4t%C3%B6s"
+  },
+  {
+   "chars": 1153,
+   "passages": 2,
+   "sha256": "9b14aa4a0f6d41e601f7ab77627fb03a5c24237835b5da85c66f75ed76324137",
+   "title": "Tilintarkastus",
+   "url": "https://fi.wikipedia.org/wiki/Tilintarkastus"
+  },
+  {
+   "chars": 5496,
+   "passages": 13,
+   "sha256": "4ec325c61086a9fb4292d86cac0b7f145523224c00105f2425b1eac6e6cd353c",
+   "title": "Toiminimi",
+   "url": "https://fi.wikipedia.org/wiki/Toiminimi"
+  },
+  {
+   "chars": 23799,
+   "passages": 43,
+   "sha256": "151057f1367b4927334519156838f94b62dd9916e2842460662341ef467bf4c9",
+   "title": "Työeläke",
+   "url": "https://fi.wikipedia.org/wiki/Ty%C3%B6el%C3%A4ke"
+  },
+  {
+   "chars": 10500,
+   "passages": 20,
+   "sha256": "46748dc8edfe149ad9aef6a16c8479332bef323e92438efa86d6a29756ab722e",
+   "title": "Työsopimus",
+   "url": "https://fi.wikipedia.org/wiki/Ty%C3%B6sopimus"
+  },
+  {
+   "chars": 3362,
+   "passages": 5,
+   "sha256": "1a256d095c55157910a8f25a93045890578d66dad72fcb7ff8ded7a1c3f6de0c",
+   "title": "Työturvallisuus",
+   "url": "https://fi.wikipedia.org/wiki/Ty%C3%B6turvallisuus"
+  },
+  {
+   "chars": 1269,
+   "passages": 4,
+   "sha256": "9a115e90cf8993ea57226ee9340a794b63eb26e0fa047259d0e84961c592d4ce",
+   "title": "Vahingonkorvaus",
+   "url": "https://fi.wikipedia.org/wiki/Vahingonkorvaus"
+  },
+  {
+   "chars": 5461,
+   "passages": 11,
+   "sha256": "b0e4b2d484d75ef808c071f1e745c3f903e5138cb9a65fad93d966f9227c896b",
+   "title": "Verohallinto",
+   "url": "https://fi.wikipedia.org/wiki/Verohallinto"
+  },
+  {
+   "chars": 5903,
+   "passages": 11,
+   "sha256": "8e2c7f98f9b2196d363d4ac49446d437d13146c4e31d8ab4445899d9fb2c8d50",
+   "title": "Yleinen tietosuoja-asetus",
+   "url": "https://fi.wikipedia.org/wiki/Yleinen_tietosuoja-asetus"
+  },
+  {
+   "chars": 1372,
+   "passages": 3,
+   "sha256": "6e508748f007752d5d866bef4dcde4d1806974f381ff40a786e7503db3db44ee",
+   "title": "Yrittäjä",
+   "url": "https://fi.wikipedia.org/wiki/Yritt%C3%A4j%C3%A4"
+  }
+ ],
+ "builder": "scripts/make_retrieval_set.py",
+ "fetched": "2026-10-24",
+ "license": "CC BY-SA 4.0",
+ "passage_chars": [
+  70,
+  800
+ ],
+ "passages": 263,
+ "set": "fi-2026-10",
+ "source": "https://fi.wikipedia.org"
+}

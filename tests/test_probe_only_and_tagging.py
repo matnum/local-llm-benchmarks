@@ -94,7 +94,9 @@ class RollupProbeOnlyTest(unittest.TestCase):
         run_sweep.consolidate(repo=self.repo)
         for r in self._rows():
             with self.subTest(metric=r["metric"]):
-                self.assertIn("f16 KV, probe-only run", r["note"])
+                # Legacy cell.json: no ttft_protocol stamp, so the note must say
+                # `warm` — those runs reused the prompt cache.
+                self.assertIn("f16 KV, warm TTFT, probe-only run", r["note"])
 
     def test_probe_only_run_does_not_override_the_full_sweep_metrics(self):
         """Latest-wins is per metric: the TTFT column moves, heat/memory must not."""

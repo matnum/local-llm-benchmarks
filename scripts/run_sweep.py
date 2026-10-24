@@ -253,15 +253,57 @@ def bench_cell(binpath, cell, repeats, pp_tokens, tg_tokens, cdir, env=None,
             for k, v in results.items()}
 
 
+def mark_run_complete(rdir):
+    """Clear the in-flight ``partial`` stamp once every selected cell finished (I2).
+
+    run.json is written with ``partial: true`` before the first cell, so a crash
+    at cell 7 leaves a run that ``consolidate()`` skips instead of one that
+    silently supplies the "latest" values for seven columns.
+    """
+    rj = f"{rdir}/run.json"
+    with open(rj) as f:
+        meta = json.load(f)
+    meta["partial"] = False
+    with open(rj, "w") as f:
+        json.dump(meta, f, indent=1)
+    return meta
+
+
+def server_argv(binpath, cell, ctx, port, threads, ngl, kv="q8_0",
+                ttft_protocol="warm", slot_dir=None):
+    """The llama-server invocation for one cell's probe phase."""
+    argv = [f"{binpath}/llama-server", "-m", cell["file"], "--host", "127.0.0.1",
+            "--port", str(port), "-c", str(ctx), "-ngl", str(ngl), "-t", str(threads),
+            "-fa", "on", "-ctk", kv, "-ctv", kv, "-np", "1",
+            "--alias", cell["id"]]
+    if ttft_protocol == "cold":
+        # The cold protocol erases a slot between requests, and the server only
+        # exposes the slots POST API (POST /slots/:id?action=erase) when started
+        # with a save path. Nothing is saved to it — the flag is what unlocks the
+        # action. (GET /slots is gated separately on --slots, which is not used.)
+        if not slot_dir:
+            raise ValueError("the cold TTFT protocol needs slot_dir "
+                             "(--slot-save-path); pass <cell_dir>/slots")
+        argv += ["--slot-save-path", slot_dir]
+    return argv
+
+
+def probe_argv(base, cell, warmup, repeats, tg_tokens, out, ttft_protocol="warm"):
+    """The ttft_probe.py invocation (protocol is its last argument)."""
+    return [sys.executable, f"{REPO}/scripts/ttft_probe.py", base, cell["id"],
+            str(warmup), str(repeats), str(tg_tokens), out, ttft_protocol]
+
+
 def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None,
-               threads=16, ngl=99, warmup=1, kv="q8_0"):
-    srv = subprocess.Popen(
-        [f"{binpath}/llama-server", "-m", cell["file"], "--host", "127.0.0.1",
-         "--port", str(port), "-c", str(ctx), "-ngl", str(ngl), "-t", str(threads),
-         "-fa", "on", "-ctk", kv, "-ctv", kv, "-np", "1",
-         "--alias", cell["id"]],
-        stdout=open(f"{cdir}/server.log", "w"), stderr=subprocess.STDOUT,
-        start_new_session=True, env=env)
+               threads=16, ngl=99, warmup=1, kv="q8_0", ttft_protocol="warm"):
+    slot_dir = f"{cdir}/slots"
+    if ttft_protocol == "cold":
+        os.makedirs(slot_dir, exist_ok=True)
+    with open(f"{cdir}/server.log", "w") as logf:
+        srv = subprocess.Popen(
+            server_argv(binpath, cell, ctx, port, threads, ngl, kv, ttft_protocol, slot_dir),
+            stdout=logf, stderr=subprocess.STDOUT,
+            start_new_session=True, env=env)
     try:
         base = f"http://127.0.0.1:{port}"
         # M7: server startup (load + weight load) scales with model size; give the
@@ -269,9 +311,9 @@ def probe_cell(binpath, cell, ctx, port, cdir, repeats, tg_tokens, env=None,
         timeout = 900 + int(cell["size_gib"]) * 15
         wait_health(base, timeout=timeout)
         ts = time.time()
-        subprocess.run([sys.executable, f"{REPO}/scripts/ttft_probe.py", base,
-                        cell["id"], str(warmup), str(repeats), str(tg_tokens),
-                        f"{cdir}/ttft.json"], check=True, timeout=3600)
+        subprocess.run(probe_argv(base, cell, warmup, repeats, tg_tokens,
+                                  f"{cdir}/ttft.json", ttft_protocol),
+                       check=True, timeout=3600)
         ts_end = time.time()
         with open(f"{cdir}/ttft.json") as f:
             ttft = json.load(f)
@@ -338,10 +380,20 @@ def build_parser(defaults):
                     help="untimed warmup requests before the timed TTFT probe")
     ap.add_argument("--power-hz", type=int, default=int(defaults.get("power_sample_hz", 5)),
                     help="resource sampler rate (power_sample_hz)")
-    ap.add_argument("--kv", choices=("q8_0", "f16"), default="q8_0",
-                    help="KV cache type for the server phase (-ctk/-ctv); q8_0 is the "
-                         "historical default, f16 avoids the quantised-KV bookkeeping "
-                         "that inflates TTFT on some Vulkan cells (RUNNING §7)")
+    ap.add_argument("--kv", choices=("q8_0", "f16"),
+                    default=defaults.get("kv", "q8_0"),
+                    help="KV cache type for the server phase (-ctk/-ctv); the default "
+                         "comes from matrix.yaml defaults.kv and matches what is "
+                         "published (f16 since D9), q8_0 being the pre-2026-10-22 "
+                         "protocol kept for reproducing those runs")
+    ap.add_argument("--ttft-protocol", choices=("cold", "warm"),
+                    default=defaults.get("ttft_protocol", "cold"),
+                    help="what the timed TTFT requests start from: 'cold' erases the "
+                         "KV cache before every request (the published protocol since "
+                         "2026-10-24 — full prompt prefill + first token, no KV "
+                         "bookkeeping in the number); 'warm' leaves the prompt cache "
+                         "alone, reproducing pre-2026-10-24 runs whose Vulkan TTFT "
+                         "carries the previous generation's KV trim (RUNNING §7)")
     ap.add_argument("--force", action="store_true", help="skip idle check")
     ap.add_argument("--rocm-override", action="store_true",
                     help="set HSA_OVERRIDE_GFX_VERSION=11.5.0")
@@ -413,21 +465,21 @@ def main():
             "ctx_server": args.ctx,
             "ctx_bench": "model-default (4096)",
             "kv_cache": args.kv,
+            "ttft_protocol": args.ttft_protocol,
             "probe_only": args.probe_only,
             **stack_stamp(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
-            # M-2: a --cells selection that does not cover the matrix is a probe.
-            # Stamp it so a later full sweep's consolidate() cannot fold its rows
-            # into the published rollup as the "latest" value for those cells.
-            "partial": not tracks_rollup([c["id"] for c in cells],
-                                         [c["id"] for c in matrix["cells"]]),
+            "partial": True,   # cleared after the final cell (see the end of main())
+            "covers_matrix": tracks_rollup([c["id"] for c in cells],
+                                           [c["id"] for c in matrix["cells"]]),
             "forced": args.force}
     json.dump(meta, open(f"{rdir}/run.json", "w"), indent=1)
     open_sweep_log(f"{rdir}/sweep.log")
     log(f"argv: {' '.join(sys.argv)}")
     log(f"harness {harness_commit[:12]} | llama.cpp {commit[:12]} | "
-        f"backend {args.backend} | cells {[c['id'] for c in cells]} "
+        f"backend {args.backend} | cells {[c['id'] for c in cells]} | "
+        f"KV {args.kv} | TTFT {args.ttft_protocol} "
         f"(bench ctx = model default; server ctx = {args.ctx})")
     ps = meta["cpu_power"]
     log(f"cpu: governor={ps['governor']} epp={ps['epp']} "
@@ -488,7 +540,8 @@ def main():
                 log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
             ttft, p0, p1 = probe_cell(env_binpath(args), cell, args.ctx, args.port,
                                       cdir, args.repeats, args.tg_tokens, env,
-                                      args.threads, args.ngl, args.warmup, args.kv)
+                                      args.threads, args.ngl, args.warmup, args.kv,
+                                      args.ttft_protocol)
             phases["probe_start"], phases["probe_end"] = p0, p1
             log(f"  probe: ttft={ttft['ttft_ms_mean']}ms gen={ttft['gen_tps_mean']} t/s")
         finally:
@@ -509,6 +562,7 @@ def main():
         pw = (res["probe_window"] or {}).get("power_w_mean")
         summary = {
             "cell": cell["id"], "backend": args.backend, "run": run_id, "kv": args.kv,
+            "ttft_protocol": args.ttft_protocol,
             "probe_only": args.probe_only,
             "model": cell["model"], "quant": cell["quant"], "arch": cell["arch"],
             "size_gib": cell["size_gib"], "bench": bench, "ttft": ttft,
@@ -518,6 +572,11 @@ def main():
         json.dump(summary, open(f"{cdir}/cell.json", "w"), indent=1)
 
     if tracks_rollup([c["id"] for c in cells], [c["id"] for c in matrix["cells"]]):
+        # I2 (review 2026-10-24): run.json said partial: true from the start, because
+        # a run is incomplete until its last cell finishes — an interrupted sweep's
+        # cells must never surface as the "latest" values. Clear it now that every
+        # selected cell has written its cell.json, then publish.
+        mark_run_complete(rdir)
         consolidate()
         # M8: record the run. The driver still never commits — an unattended sweep
         # must not write to git — but it now names the tag, stamps it into run.json
@@ -529,7 +588,7 @@ def main():
                                time.strftime("%Y%m%d"))
         msg = tag_message(args.backend, len(cells), harness_commit, commit,
                           meta.get("kernel", "unknown"), meta.get("mesa", "unknown"),
-                          args.kv, args.probe_only)
+                          args.kv, args.probe_only, args.ttft_protocol)
         rj = f"{rdir}/run.json"
         with open(rj) as f:
             stamped = json.load(f)
@@ -638,12 +697,14 @@ def next_run_tag(existing, date):
     return f"run-{date}-{max(used) + 1 if used else 1}"
 
 
-def tag_message(backend, cells, harness, llama, kernel, mesa, kv, probe_only):
+def tag_message(backend, cells, harness, llama, kernel, mesa, kv, probe_only,
+                ttft_protocol="warm"):
     """The annotated-tag message for a sweep, in the style of the existing run tags."""
     name = {"vulkan": "Vulkan", "rocm": "ROCm"}.get(backend, backend)
     kind = "probe-only sweep" if probe_only else "full sweep"
     return (f"{name} {kind} — {cells} cells, harness {(harness or 'unknown')[:7]}, "
-            f"llama.cpp {(llama or 'unknown')[:9]}, {kernel} / {mesa}, KV {kv}")
+            f"llama.cpp {(llama or 'unknown')[:9]}, {kernel} / {mesa}, KV {kv}, "
+            f"TTFT {ttft_protocol}")
 
 
 def repo_tags(repo):
@@ -715,7 +776,13 @@ def consolidate(repo=REPO):
             # soak), so temp/vram/mem/tok_per_w from it would understate the
             # full-sweep cell those numbers are published from.
             probe_only = bool(s.get("probe_only"))
-            kvnote = f" [{s.get('kv', '?')} KV, probe-only run]" if probe_only else ""
+            # I3 (review 2026-10-24): every streaming row names the condition it was
+            # measured under, not just the probe-only ones. Legacy cell.json files
+            # predate both flags — those runs used the driver's hardcoded q8_0 KV with
+            # prompt-cache reuse, i.e. `[q8_0 KV, warm TTFT]`.
+            proto = s.get("ttft_protocol") or "warm"
+            kvnote = f" [{s.get('kv') or 'q8_0'} KV, {proto} TTFT"
+            kvnote += ", probe-only run]" if probe_only else "]"
             for test, stats in ({} if probe_only else s["bench"]).items():
                 reps = stats.get("repeats")
                 if isinstance(reps, list):      # legacy cell.json: parsed rows list
@@ -787,8 +854,11 @@ def consolidate(repo=REPO):
     md = ["# Results", "",
           f"> Rollup built by harness `{rollup_commit[:12]}`. Sustained = llama-server "
           "streaming 512-token generations. bench = llama-bench (mean of repeats). "
-          "probe W = GPU power mean during server phase. TTFT mean is inflated where "
-          "the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = "
+          "probe W = GPU power mean during server phase. TTFT = first-token latency "
+          "of a streaming request; cold TTFT erases the KV cache before each timed "
+          "request (protocol stamped per row) so mean and p50 agree, warm TTFT "
+          "carries the previous generation's KV work and spreads wide on Vulkan — "
+          "compare with p50. Peak GPU mem = "
           "peak (VRAM + GTT), the residency figure; runs that predate GTT sampling "
           "show the VRAM pool only.", ""]
     runs = {}

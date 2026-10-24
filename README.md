@@ -246,7 +246,9 @@ Five models × the five task families that have a `cf` variant × prompt variant
 overflows, no unusable gold indices. The driver also supports the rest of the
 upstream grid — two formulations (`cf`, `mcf`) × five prompt variants
 (`p0`–`p4`), one pair per run (`--formulation` / `--variant`) — but the table
-below is `cf`/`p0`, the only pair swept so far. Cells are **acc / acc_norm**;
+below is `cf`/`p0`, the only pair swept across all five models; `mcf`/`p0` has a
+one-model probe, reported separately below as a negative result. Cells are
+**acc / acc_norm**;
 `acc_norm` divides the choice loglikelihood by its character length, exactly as
 the harness does. Full detail: [results/finbench-table.md](results/finbench-table.md).
 
@@ -301,9 +303,10 @@ prompt. One full-split probe (`fi-mcf-p0-20261021`, Poro 2 8B Q4_K_M) shows it i
 | **mean acc** | **0.530** | **0.445** | **−0.085** |
 
 Why the mean is misleading: `belebele_fin` collapses to chance (0.239 against
-0.25 for four options) and predicted "A" on all 900 items. A 200-item control
-scored the same items with bare and space-prefixed continuations and still picked
-"A" every time, so under `mcf` that task measures letter bias, not
+0.25 for four options) because it answered `A` on 887 of the 900 items (the
+other 13: 9 `B`, 4 `D`) — the same near-constant answer under both bare and
+space-prefixed continuations in a 200-item scratch control (whose output is not
+tracked here), so under `mcf` that task measures letter bias, not
 comprehension. `goldenswag`'s `acc_norm` falls to 0.199 — below chance — because
 upstream's `mcf` prompt asks for a letter while `doc_to_choice` remains the full
 endings. `arc_c` and `sib200` improve (the options in context help), `scandisent`
@@ -418,8 +421,10 @@ What is pinned, and where:
   on the same stack moved `server tg` by −0.2…+1.4% (mean |Δ| 0.18%) and `TTFT p50` by
   −5.9…+8.1% (mean |Δ| 2.0%). Differences under ~2% are within noise for this setup —
   and per-request latency is noisier than throughput.
-- **FIN-bench is one formulation.** `cf` at prompt variant `p0` only. `mcf` and
-  `p1`–`p4` are unmeasured, and formulation is known to move scores.
+- **FIN-bench is one comparable formulation.** `cf` at prompt variant `p0`
+  only. `mcf`/`p0` exists for a single cell as a documented negative result —
+  it is not a like-for-like scale — and `p1`–`p4` are unmeasured; formulation
+  is known to move scores.
 - **Quantizations differ across the matrix.** The Finnish comparison is
   quant-matched; the throughput matrix is not — each cell uses the quant that
   fits the footprint being tested.

@@ -225,6 +225,28 @@ class ConsolidateTest(unittest.TestCase):
         # the pilot cell never appears
         self.assertNotIn("| cell |", md)
 
+    def test_non_cf_pair_is_labelled_not_comparable(self):
+        """A `mcf` section must carry its caveat; the published `cf` pair must not.
+
+        The tracked table is read on its own (the README is where the diagnosis
+        lives), so the negative result has to travel with the numbers.
+        """
+        self._write_summary("fi-mcf", "mcf", "p0", pilot=0, cell="cell_a")
+        self._write_summary("fi-cf", "cf", "p0", pilot=0, cell="cell_b")
+        with mock.patch.object(finbench, "RESULTS", self.results):
+            finbench.consolidate()
+        md = open(self.tracked_md).read()
+        cf_part, mcf_part = md.split("## `mcf` / `p0`")
+        self.assertNotIn("not a like-for-like scale", cf_part)
+        self.assertIn("not a like-for-like scale", mcf_part)
+
+    def test_header_names_the_upstream_snapshot(self):
+        self._write_summary("fi-cf", "cf", "p0", pilot=0, cell="cell_b")
+        with mock.patch.object(finbench, "RESULTS", self.results):
+            finbench.consolidate()
+        md = open(self.tracked_md).read()
+        self.assertIn(f"upstream-{finbench.UPSTREAM_COMMIT}.json", md)
+
 
 if __name__ == "__main__":
     unittest.main()

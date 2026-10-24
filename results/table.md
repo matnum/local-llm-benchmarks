@@ -1,6 +1,6 @@
 # Results
 
-> Rollup built by harness `da7ad4f45748`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = peak (VRAM + GTT), the residency figure; runs that predate GTT sampling show the VRAM pool only.
+> Rollup built by harness `7344521aed63`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT mean is inflated where the per-request spread is wide (Vulkan) — compare with p50. Peak GPU mem = peak (VRAM + GTT), the residency figure; runs that predate GTT sampling show the VRAM pool only.
 
 ## run-20261002-1719 — rocm
 
@@ -87,3 +87,33 @@
 | qwen3.5-35b-a3b-q6_k | Q6_K | 1054.68 | 51.32 | 50.54 | 64.6 | 72.8 | 85.0 | 0.59 | 27.4 |
 | qwen3.8-27b-q5_k_xl | Q5_K_XL | 308.37 | 10.37 | 10.33 | 168.2 | 137.2 | 85.4 | 0.12 | 19.59 |
 | qwen3.8-27b-q6_k | Q6_K | 308.6 | 9.83 | 9.82 | 174.5 | 152.6 | 85.3 | 0.12 | 20.53 |
+
+## run-20261023-1140 — vulkan
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | – | – | 23.32 | 101.7 | 48.3 | – | – | – |
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | – | – | 54.16 | 108.0 | 116.5 | – | – | – |
+| poro2-70b-q4_k_m | Q4_K_M | – | – | 5.25 | 226.9 | 199.0 | – | – | – |
+| poro2-8b-q8_0 | Q8_0 | – | – | 26.82 | 47.3 | 42.3 | – | – | – |
+| qwen3-32b-q5_k_m | Q5_K_M | – | – | 9.66 | 159.1 | 185.7 | – | – | – |
+| qwen3-4b-q8_0 | Q8_0 | – | – | 48.12 | 43.4 | 27.6 | – | – | – |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | – | – | 73.56 | 35.3 | 44.0 | – | – | – |
+| qwen3.5-35b-a3b-q6_k | Q6_K | – | – | 60.98 | 63.8 | 48.3 | – | – | – |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | – | – | 10.51 | 331.0 | 422.0 | – | – | – |
+| qwen3.8-27b-q6_k | Q6_K | – | – | 9.92 | 1092.6 | 818.5 | – | – | – |
+
+## run-20261023-1159 — rocm
+
+| cell | quant | pp2048 t/s | tg512 bench t/s | tg server t/s | TTFT mean ms | TTFT p50 ms | probe W | tok/s/W | peak GPU mem GiB |
+|---|---|---|---|---|---|---|---|---|---|
+| eurollm-9b-q8_0 | Q8_0 | – | – | 22.93 | 55.5 | 46.2 | – | – | – |
+| gpt-oss-120b-mxfp4 | MXFP4 (native) | – | – | 50.21 | 73.5 | 74.9 | – | – | – |
+| poro2-70b-q4_k_m | Q4_K_M | – | – | 5.18 | 219.4 | 196.7 | – | – | – |
+| poro2-8b-q8_0 | Q8_0 | – | – | 26.41 | 42.0 | 40.7 | – | – | – |
+| qwen3-32b-q5_k_m | Q5_K_M | – | – | 9.52 | 128.9 | 110.9 | – | – | – |
+| qwen3-4b-q8_0 | Q8_0 | – | – | 46.29 | 26.5 | 24.8 | – | – | – |
+| qwen3-coder-30b-a3b-q6_k | Q6_K | – | – | 59.87 | 30.4 | 21.4 | – | – | – |
+| qwen3.5-35b-a3b-q6_k | Q6_K | – | – | 50.62 | 68.8 | 77.2 | – | – | – |
+| qwen3.8-27b-q5_k_xl | Q5_K_XL | – | – | 10.33 | 171.7 | 140.4 | – | – | – |
+| qwen3.8-27b-q6_k | Q6_K | – | – | 9.81 | 175.3 | 143.6 | – | – | – |

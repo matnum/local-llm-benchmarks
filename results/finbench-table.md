@@ -2,6 +2,8 @@
 
 Scored by `tools/score_ll` (pinned llama.cpp logits) from the upstream templates vendored in `docs/finbench/`. Cells are **acc / acc_norm**; `acc` = argmax loglikelihood of the choice text, `acc_norm` divides by the choice's character length, exactly as `lm_eval/api/task.py` does. Items per task: 900, 1000, 1004, 2048, 2344. Pilots are excluded.
 
+Prompts rendered from `docs/finbench/upstream-af382197b365c90c9a016fefb9cf32b976fd178d.json` — upstream `LumiOpen/lm-evaluation-harness` @ `af382197b365c90c9a016fefb9cf32b976fd178d`.
+
 ## `cf` / `p0`
 
 Run `fi-20261003`.
@@ -21,3 +23,5 @@ Run `fi-mcf-p0-20261021`.
 | model | arc_c | belebele_fin | goldenswag | scandisent | sib200 | mean acc |
 |---|---|---|---|---|---|---|
 | poro2-8b-q4_k_m | 0.466 / 0.424 | 0.239 / 0.239 | 0.335 / 0.199 | 0.811 / 0.811 | 0.372 / 0.253 | 0.445 |
+
+**Negative result — not a like-for-like scale.** `mcf` lists the options inside the prompt and, for some families, scores a different choice set, so its accuracy is not comparable with `cf` or with published FIN-bench tables. Read the README section on formulation sensitivity before quoting a cell.

@@ -459,7 +459,9 @@ def consolidate(_run_id=None):
           "argmax loglikelihood of the choice text, `acc_norm` divides by the choice's "
           "character length, exactly as `lm_eval/api/task.py` does. Items per task: "
           + (f"{ns[0]}" if len(ns) == 1 else ", ".join(str(n) for n in ns))
-          + ". Pilots are excluded.", ""]
+          + ". Pilots are excluded.", "",
+          f"Prompts rendered from `docs/finbench/upstream-{UPSTREAM_COMMIT}.json` — "
+          f"upstream `LumiOpen/lm-evaluation-harness` @ `{UPSTREAM_COMMIT}`.", ""]
     for (formulation, variant), combo_rows in sorted(grouped.items()):
         run_ids = sorted({r["run_id"] for r in combo_rows})
         md += [f"## `{formulation}` / `{variant}`", "",
@@ -478,6 +480,15 @@ def consolidate(_run_id=None):
             md.append(f"| {cell} | " + " | ".join(
                 f"{vals[t]['acc']:.3f} / {vals[t]['acc_norm']:.3f}" if t in vals else "–"
                 for t in tasks) + f" | {mean:.3f} |")
+        if formulation != "cf":
+            # A non-cf pair changes the prompt *and* (for some families) the scored
+            # choice set, so it is a diagnostic, never a capability score. Say so in
+            # the table itself: this file is read on its own.
+            md += ["", "**Negative result — not a like-for-like scale.** `mcf` lists the "
+                   "options inside the prompt and, for some families, scores a "
+                   "different choice set, so its accuracy is not comparable with `cf` "
+                   "or with published FIN-bench tables. Read the README section on "
+                   "formulation sensitivity before quoting a cell.", ""]
         md.append("")
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md).rstrip() + "\n")

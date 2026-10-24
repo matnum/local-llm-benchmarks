@@ -95,6 +95,7 @@ Options (from `--help`). Run-parameter defaults come from `matrix.yaml` `default
 | `--force` | off | skip the idle gate (results flagged contaminated) |
 | `--rocm-override` | off | set `HSA_OVERRIDE_GFX_VERSION=11.5.0` (gfx1151 fallback, see §7) |
 | `--consolidate` | off | rebuild `consolidated.csv` + `table.md` from existing run dirs and exit; no GPU, no `--backend` needed |
+| `--check` | off | verify that the tracked rollups match what the local run dirs would rebuild, and exit 1 on drift; read-only, local-only (raw run dirs are gitignored, so CI has none) — see §3c |
 | `--probe-only` | off | re-run **only** the `llama-server` + TTFT probe phase (no `llama-bench`), for re-measuring TTFT with a different KV type; see §3b |
 | `--ttft-protocol {cold,warm}` | `cold` (`matrix.yaml` `defaults.ttft_protocol`) | what a timed TTFT request starts from: `cold` erases the slot's KV cache first (published since 2026-10-24 — full prompt prefill + first token, no KV bookkeeping in the number); `warm` leaves the prompt cache alone and is the pre-2026-10-24 protocol, kept to reproduce those runs; see §3c and §7 |
 | `--tag` | off | after a full sweep, create the annotated run tag — but only when the tracked results already match HEAD, otherwise the exact commands are printed |
@@ -145,20 +146,27 @@ from an empty KV cache: `ttft_probe.py` calls `POST /slots/0?action=erase` befor
 one. The erase is untimed — it is setup, not latency — and `ttft.json` records
 `protocol` plus each request's `erased_tokens`, so the data shows what was dropped.
 
-The server must be started with `--slot-save-path` for the slots API to exist at all;
-`probe_cell()` adds it (pointed at `<cell_dir>/slots`) only in cold mode. Nothing is
-saved there — the flag only unlocks the action. `--kv` and the protocol are independent:
+The server must be started with `--slot-save-path` for the erasing
+`POST /slots/:id?action=erase` action to exist — that flag is what gates the action.
+`GET /slots` is gated separately on `--slots`, which this harness never passes, so a
+missing `--slots` is not the error you will see. `probe_cell()` adds
+`--slot-save-path` (pointed at `<cell_dir>/slots`) only in cold mode. Nothing is saved
+there — the flag only unlocks the action. `--kv` and the protocol are independent:
 the published runs are `f16` KV *and* cold.
 
 Why it exists, measured on three cells (3×512-token requests, f16 KV; the full ten-cell
-per-request table is in §7):
+per-request table is in §7). Both sides of the comparison are tracked per request in
+[`results/ttft-per-request.csv`](../results/ttft-per-request.csv) — warm rows from
+`run-20261023-1140`/`-1159` (the column published until 2026-10-24), cold rows from
+`run-20261024-0910`/`-0930` — and `tests/test_ttft_extract.py` checks this table against
+that file, so it cannot be retyped from memory again:
 
-| cell | warm TTFT (pre-2026-10-24) | cold TTFT |
-|---|---|---|
-| Qwen3-4B Q8_0, Vulkan | 22 / 78 / 26 ms (spread 56) | 55 / 53 / 56 ms (spread 2.2) |
-| Qwen3-4B Q8_0, ROCm | 23 / 31 / 24 ms (spread 7.8) | 43 / 43 / 43 ms (spread 0.5) |
-| Qwen3-32B Q5_K_M, Vulkan | 106 / 183 / 183 ms (spread 77) | 406 / 432 / 431 ms (spread 26) |
-| Qwen3.8-27B Q5_K_XL, Vulkan | 136 / 332 / 341 ms (spread 205) | 480 / 508 / 512 ms (spread 32) |
+| cell | backend | warm per request (ms) | warm spread | cold per request (ms) | cold spread |
+|---|---|---|---|---|---|
+| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 55.3 / 53.4 / 55.6 | 2.2 |
+| `qwen3-4b-q8_0` | rocm | 23.4 / 31.2 / 24.8 | 7.8 | 43.5 / 43.5 / 43.0 | 0.5 |
+| `qwen3-32b-q5_k_m` | vulkan | 104.9 / 186.7 / 185.7 | 81.8 | 405.7 / 431.9 / 431.0 | 26.2 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 143.3 / 422.0 / 427.7 | 284.4 | 479.8 / 507.9 / 512.0 | 32.2 |
 
 `gen_tps` was unchanged on a clean pass — the ten-cell cold runs reproduce the warm runs'
 `server tg` within ±0.3% on Vulkan and ±0.4% mean on ROCm (one cell, gpt-oss on ROCm, −2.7%)
@@ -185,7 +193,7 @@ Reproduce a cold pass without re-running the bench phase:
 `--ttft-protocol warm` re-creates the pre-2026-10-24 column; the two protocols are
 different quantities and the rollup note says which one a row carries. The per-request
 values behind the published cold column are tracked in
-[`results/ttft-per-request-20261024.csv`](../results/ttft-per-request-20261024.csv), and
+[`results/ttft-per-request.csv`](../results/ttft-per-request.csv), and
 `tests/test_ttft_extract.py` re-derives the rollup's mean/median from it.
 
 ## 3d. Run the tests
@@ -228,6 +236,19 @@ After all cells: **rebuild** `results/consolidated.csv` and `results/table.md` f
 `run-*` directory (full rewrite, not append — so a Vulkan pass then a ROCm pass does not
 duplicate rows). The same rebuild is available standalone via `--consolidate`, for when a
 sweep is aborted or only some cells were selected.
+
+The driver cannot tell whether the tracked rollup in the worktree is the one those run dirs
+produce, so before committing run numbers check it:
+
+```
+/usr/bin/python3 scripts/run_sweep.py --check      # exit 1 on drift, names the rows
+```
+
+`--check` is deliberately local-only: it rebuilds the rollup in memory and diffs it against
+the tracked files, and raw `run-*` dirs are gitignored, so a CI checkout has nothing to
+compare (it says so and passes). This is the drift guard the README once claimed the test
+suite provided (review I5, 2026-10-24): the suite can only diff the README against the
+tracked CSV, which fires *after* a rebuild has already invalidated the README.
 
 ## 5. Where results land
 
@@ -321,7 +342,7 @@ so a stale figure cannot ship with fresh numbers.
 
   Per-request values, clean Vulkan pass (3 × 512-token requests) — the same data,
   both backends, is tracked in
-  [`results/ttft-per-request-20261024.csv`](../results/ttft-per-request-20261024.csv)
+  [`results/ttft-per-request.csv`](../results/ttft-per-request.csv)
   so a reader can check it without the gitignored run dirs:
 
   | cell | warm p50 (pre-2026-10-24) | cold per request (ms) | cold p50 |

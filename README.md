@@ -366,16 +366,20 @@ What is pinned, and where:
   The suite cannot rebuild them from the run data (it does not have it on CI) —
   it diffs the README against the tracked CSV, so a value that drifts from the
   rollup fails. Rebuilding needs the run directories, i.e. the machine that
-  measured them (`--consolidate`).
+  measured them (`--consolidate`), and so does the drift guard that checks the
+  tracked rollup still matches them (`--check`, exit 1 and the offending rows when
+  it does not).
 - **Published numbers are tested.** The percentages in this README are
   recomputed from the rollup by `tests/test_readme_ranges.py`, the results
   and FIN-bench tables are diffed against the rollups by
   `tests/test_readme_tables.py`, and `results/consolidated.csv` must carry one
   KV type and one TTFT protocol per cell across both backends
   (`tests/test_rollup_protocol_consistency.py`). The TTFT column's per-request data
-  is tracked in `results/ttft-per-request-20261024.csv` and re-derived from it
-  (`tests/test_ttft_extract.py`), so the latency argument is checkable without the
-  gitignored run directories. CI runs them on every pull request.
+  for **both** protocols is tracked in `results/ttft-per-request.csv` and
+  re-derived from it (`tests/test_ttft_extract.py`), which also checks the
+  per-request table in `docs/RUNNING.md` §3c against the extract — so the latency
+  argument is checkable without the gitignored run directories. CI runs them on
+  every pull request.
 
 ## Repository layout
 

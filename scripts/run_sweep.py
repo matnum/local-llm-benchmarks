@@ -7,6 +7,7 @@ Usage:
                [--ctx 8192] [--threads 16] [--ngl 99] [--warmup 1]
                [--power-hz 5] [--force] [--rocm-override]
   run_sweep.py --consolidate        # rebuild the rollups from existing run dirs
+  run_sweep.py --check              # verify the tracked rollups match the run dirs
 
 Run-parameter defaults come from matrix.yaml `defaults` (single source of truth);
 the flags above override them per run.
@@ -26,6 +27,7 @@ stdlib + PyYAML only.
 import argparse
 import csv
 import glob
+import io
 import json
 import os
 import platform
@@ -400,6 +402,10 @@ def build_parser(defaults):
     ap.add_argument("--consolidate", action="store_true",
                     help="rebuild results/consolidated.csv + results/table.md from "
                          "existing run dirs, then exit (no GPU work)")
+    ap.add_argument("--check", action="store_true",
+                    help="verify that the tracked rollups match what the local run "
+                         "dirs would rebuild, then exit 1 on drift (no writes, no GPU "
+                         "work; local-only — a CI checkout has no run dirs)")
     ap.add_argument("--probe-only", action="store_true",
                     help="re-run only the llama-server + TTFT probe phase (no llama-bench) "
                          "and publish only the streaming columns; use to re-measure TTFT "
@@ -418,6 +424,22 @@ def main():
     ap = build_parser(matrix.get("defaults") or {})
     args = ap.parse_args()
 
+    if args.check:
+        # Review I5: the drift guard the README once claimed the suite provided.
+        # Local-only by construction — raw run dirs are gitignored.
+        problems, n_runs = check_rollup()
+        if not n_runs:
+            log("no results/run-* dirs here — nothing to check (a CI checkout has none)")
+            return
+        if not problems:
+            log(f"rollup up to date: results/consolidated.csv + results/table.md "
+                f"match {n_runs} run dir(s)")
+            return
+        log(f"ROLLUP DRIFT ({len(problems)} problem(s)) — run --consolidate on this "
+            f"machine, then regenerate the README prose/tables in the same commit:")
+        for p in problems:
+            log(f"  {p}")
+        sys.exit(1)
     if args.consolidate:
         # Standalone rollup: usable after an aborted/partial sweep, which is
         # exactly when consolidate() never got to run before.
@@ -425,7 +447,7 @@ def main():
         log("consolidated -> results/consolidated.csv + results/table.md")
         return
     if not args.backend:
-        ap.error("--backend is required unless --consolidate is given")
+        ap.error("--backend is required unless --consolidate/--check is given")
 
     env = dict(os.environ)
     if args.rocm_override:
@@ -750,8 +772,12 @@ def results_match_head(repo):
     return True
 
 
-def consolidate(repo=REPO):
-    """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
+FIELDS = ["run_id", "backend", "cell", "model", "quant", "size_gib",
+          "metric", "unit", "value", "note"]
+
+
+def build_rows(repo=REPO):
+    """Re-derive every rollup row from the on-disk run dirs (writes nothing)."""
     rows = []
     for rj in sorted(glob.glob(f"{repo}/results/run-*/**/run.json", recursive=True)):
         rd_ = os.path.dirname(rj)
@@ -833,18 +859,20 @@ def consolidate(repo=REPO):
             if s.get("tok_per_w") and not probe_only:
                 rows.append({**base, "metric": "tok_per_w", "unit": "t/s/W",
                              "value": s["tok_per_w"], "note": "server tg / probe W mean"})
+    return rows
 
-    path = f"{repo}/results/consolidated.csv"
-    fields = ["run_id", "backend", "cell", "model", "quant", "size_gib",
-              "metric", "unit", "value", "note"]
-    # B3: rebuild the whole file ("w") — rows are already re-derived from ALL run
-    # dirs above. Append mode re-emitted every run's rows on each call, so a Vulkan
-    # pass followed by ROCm would double every Vulkan row.
-    with open(path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(rows)
 
+def consolidated_csv_text(rows):
+    """The exact bytes `results/consolidated.csv` should have for these rows."""
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=FIELDS, extrasaction="ignore")
+    w.writeheader()
+    w.writerows(rows)
+    return buf.getvalue()
+
+
+def render_table(rows, repo=REPO):
+    """`results/table.md` for these rows."""
     # render table.md (all runs)
     # M7: record which harness build produced the rollup. run.json stamps the
     # capture-time harness; this stamps the driver code that generated the numbers,
@@ -856,7 +884,8 @@ def consolidate(repo=REPO):
           "streaming 512-token generations. bench = llama-bench (mean of repeats). "
           "probe W = GPU power mean during server phase. TTFT = first-token latency "
           "of a streaming request; cold TTFT erases the KV cache before each timed "
-          "request (protocol stamped per row) so mean and p50 agree, warm TTFT "
+          "request (protocol stamped per row), so mean and p50 agree to within a few "
+          "percent (worst 1.04x on the published pass). Warm TTFT "
           "carries the previous generation's KV work and spreads wide on Vulkan — "
           "compare with p50. Peak GPU mem = "
           "peak (VRAM + GTT), the residency figure; runs that predate GTT sampling "
@@ -884,8 +913,97 @@ def consolidate(repo=REPO):
                 # and fall back to the VRAM pool for runs that predate it.
                 v=m.get("mem_peak_gib") or m.get("vram_peak_gib", "–")))
         md.append("")
+    return "\n".join(md)
+
+
+def consolidate(repo=REPO):
+    """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
+    rows = build_rows(repo)
+    # B3: rebuild the whole file ("w") — rows are already re-derived from ALL run
+    # dirs above. Append mode re-emitted every run's rows on each call, so a Vulkan
+    # pass followed by ROCm would double every Vulkan row.
+    with open(f"{repo}/results/consolidated.csv", "w", newline="") as f:
+        f.write(consolidated_csv_text(rows))
     with open(f"{repo}/results/table.md", "w") as f:
-        f.write("\n".join(md))
+        f.write(render_table(rows, repo))
+    return rows
+
+
+def check_rollup(repo=REPO):
+    """Report how the tracked rollup differs from what the run dirs would rebuild.
+
+    Review I5 (2026-10-24): README/workflow claimed the suite rebuilds the rollup
+    from the per-run data to catch drift. It cannot — raw run dirs are gitignored,
+    so CI has none, and the only real guard was the README-vs-CSV value diff, which
+    fires *after* a rebuild has already invalidated the README (that is how B1 was
+    reachable). This is the operator-side check that claim promised: run it on the
+    machine that measured the runs before committing, and it names every row that a
+    local `--consolidate` would add, drop or change. Returns (problems, n_run_dirs).
+    """
+    rundirs = sorted(glob.glob(f"{repo}/results/run-*"))
+    problems = []
+    if not rundirs:
+        return problems, 0
+    tracked_csv = f"{repo}/results/consolidated.csv"
+    tracked_md = f"{repo}/results/table.md"
+    rows = build_rows(repo)
+
+    try:
+        with open(tracked_csv, newline="") as f:
+            tracked = list(csv.DictReader(f))
+    except OSError:
+        return [f"tracked rollup missing: {tracked_csv}"], len(rundirs)
+
+    def key(r):
+        return (r["run_id"], r["backend"], r["cell"], r["metric"])
+
+    have = {key(r): r for r in tracked}
+    want = {key(r): r for r in rows}
+    missing = sorted(set(want) - set(have))
+    extra = sorted(set(have) - set(want))
+    changed = sorted(k for k in set(want) & set(have)
+                     if (str(want[k]["value"]), want[k]["note"])
+                     != (have[k]["value"], have[k]["note"]))
+    for k in missing[:5]:
+        problems.append(f"new row {k[0]}/{k[1]}/{k[2]} {k[3]}={want[k]['value']} "
+                        "(a run dir is not in the tracked rollup)")
+    for k in extra[:5]:
+        problems.append(f"stale row {k[0]}/{k[1]}/{k[2]} {k[3]}={have[k]['value']} "
+                        "(no run dir publishes it any more)")
+    for k in changed[:10]:
+        problems.append(f"changed {k[0]}/{k[1]}/{k[2]} {k[3]}: tracked "
+                        f"{have[k]['value']} -> rebuilt {want[k]['value']}")
+    for label, n, shown in (("new", len(missing), 5), ("stale", len(extra), 5),
+                            ("changed", len(changed), 10)):
+        if n > shown:
+            problems.append(f"... and {n - shown} more {label} rows")
+
+    # table.md must agree too. Only the harness stamp on line 3 may differ: it names
+    # the last commit to touch the driver, so it moves with unrelated commits by
+    # design. Normalise that hash instead of dropping the line, because that same
+    # line carries the rollup's prose (dropping it made a prose edit invisible).
+    stamp = re.compile(r"^> Rollup built by harness `[^`]*`")
+
+    def normalise(text):
+        return [stamp.sub("> Rollup built by harness `<harness>`", ln)
+                for ln in text.splitlines()]
+
+    try:
+        with open(tracked_md) as f:
+            tracked_lines = normalise(f.read())
+    except OSError:
+        problems.append(f"tracked table missing: {tracked_md}")
+    else:
+        rebuilt_lines = normalise(render_table(rows, repo))
+        if tracked_lines != rebuilt_lines:
+            diff = [(i, a, b) for i, (a, b) in
+                    enumerate(zip(tracked_lines, rebuilt_lines)) if a != b][:3]
+            for i, a, b in diff:
+                problems.append(f"table.md line {i + 1}: tracked {a!r} -> rebuilt {b!r}")
+            if len(tracked_lines) != len(rebuilt_lines):
+                problems.append(f"table.md has {len(tracked_lines)} lines, "
+                                f"rebuilt has {len(rebuilt_lines)}")
+    return problems, len(rundirs)
 
 
 if __name__ == "__main__":

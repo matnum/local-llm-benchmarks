@@ -1,6 +1,6 @@
 # Results
 
-> Rollup built by harness `7344521aed63`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT = first-token latency of a streaming request; cold TTFT erases the KV cache before each timed request (protocol stamped per row) so mean and p50 agree, warm TTFT carries the previous generation's KV work and spreads wide on Vulkan — compare with p50. Peak GPU mem = peak (VRAM + GTT), the residency figure; runs that predate GTT sampling show the VRAM pool only.
+> Rollup built by harness `ab44daecbbf0`. Sustained = llama-server streaming 512-token generations. bench = llama-bench (mean of repeats). probe W = GPU power mean during server phase. TTFT = first-token latency of a streaming request; cold TTFT erases the KV cache before each timed request (protocol stamped per row), so mean and p50 agree to within a few percent (worst 1.04x on the published pass). Warm TTFT carries the previous generation's KV work and spreads wide on Vulkan — compare with p50. Peak GPU mem = peak (VRAM + GTT), the residency figure; runs that predate GTT sampling show the VRAM pool only.
 
 ## run-20261002-1719 — rocm
 

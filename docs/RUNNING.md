@@ -124,6 +124,14 @@ What a probe-only run publishes, and why it is not a full sweep:
 - A probe-only pass is still a `--cells`-complete run (not `partial`), so it does update
   the tracked rollup — that is the point. A `--cells` subset remains excluded (M-2).
 
+**First use (2026-10-23):** the ten-cell f16 re-probe —
+`results/run-20261023-1140` (Vulkan) and `-1159` (ROCm), both `--kv f16 --probe-only` —
+answered the TTFT protocol question and doubles as the run-to-run noise measurement:
+`tg_server_tps` within −0.2…+1.4%, `ttft_ms` −4.4…+6.5%, `ttft_ms_p50` −5.9…+8.1% over
+20 cell/backend pairs (§7). The streaming columns in `results/table.md` and the README
+table now come from these two runs, each row keeping its own `run_id`; the bench, power
+and memory columns stay attributed to the 2026-10-22 full sweeps.
+
 ## 3c. Run the tests
 
 The harness has a small stdlib-`unittest` suite (no pytest dependency) covering the
@@ -142,8 +150,8 @@ The harness has a small stdlib-`unittest` suite (no pytest dependency) covering 
 3. **Resource sampler** — spawns `sampler.py` writing `resources.csv` at 5 Hz (sysfs only).
 4. **`llama-bench`** — for each pp point (`-n 0`) plus one tg run (`-p 0 -n 512`), `-ngl 99
    -t 16 -r <repeats>`; output → `bench.log`. Runs at the **model-default context** (see §7).
-5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk q8_0 -ctv
-   q8_0 -np 1 --alias <cell>`), waits on `/health` (timeout scales with model size:
+5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk <kv> -ctv <kv> -np 1 --alias <cell>`,
+   `--kv` defaulting to `q8_0`; the published 2026-10-22/23 runs used `f16`), waits on `/health` (timeout scales with model size:
    `900 + size_gib*15` s), then runs `ttft_probe.py`: 1 untimed warmup request, then `N`
    timed **streaming** 512-token completions (temperature 0, **`ignore_eos: true`**) →
    `ttft.json`. TTFT = time to first streamed token; gen_tps = tokens / (t_end − t_first),
@@ -272,6 +280,19 @@ so a stale figure cannot ship with fresh numbers.
   "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
   Re-measuring the column for one KV type is what `--probe-only` exists for (§3b); pass `--kv`
   explicitly so the run's `run.json` states the protocol it used.
+
+  **The published column is f16 KV, and a ten-cell re-probe confirms it (2026-10-23).** Both
+  2026-10-22 sweeps ran with `--kv f16` — `sweep.log` records the argv and `run.json` stamps
+  `kv_cache: f16` — so the q8 arm above was a single-variable experiment, never the published
+  protocol. The probe-only pass (`run-20261023-1140` Vulkan, `run-20261023-1159` ROCm, both
+  `--kv f16 --probe-only`, same kernel/Mesa/llama.cpp) re-measured all ten cells and reproduced
+  the column instead of moving it: `tg_server_tps` within **−0.2…+1.4%** (mean |Δ| 0.18%),
+  `ttft_ms` mean within **−4.4…+6.5%** and `ttft_ms_p50` within **−5.9…+8.1%** (mean |Δ| 1.7% /
+  2.0%), over 20 cell/backend pairs. Two conclusions: the TTFT column needs no protocol change,
+  and the ~2% noise floor the README quotes is now measured rather than assumed. What f16 does
+  not remove is the stall itself — the 27B Q6_K cell measures 818 / 1641 / 818 ms, a ~0.8 s
+  middle request — so the mean stays inflated on that cell and the median remains the figure to
+  quote. A cold-request protocol is the remaining option and has not been run.
 - **Numbers are stack-stamped, and the published tables were re-measured.** The tracked
   tables now come from the 2026-10-22 sweeps: kernel 7.2.10 / Mesa 26.2.4 (`docs/env.md`).
   The 2026-10-02/03 rows were measured on kernel 7.2.8 / Mesa 26.2.3 and stay in the rollup

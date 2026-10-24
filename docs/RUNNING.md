@@ -571,3 +571,43 @@ Two caveats before quoting a number:
   consistent.
 - **Not a drop-in lm-eval number.** Prompts, datasets and metric definitions match the fork;
   the scoring engine does not. Comparable-with-a-caveat, not leaderboard-submittable.
+
+## 10. Embeddings axis — Finnish retrieval (`fi-2026-10`)
+
+The set is committed, so this axis needs no network: 263 passages from 24 Finnish
+Wikipedia articles (CC BY-SA 4.0, per-article sha256 in
+`docs/retrieval/fi-2026-10/manifest.json`) and 30 hand-authored queries whose
+qrels are derived from an answer string (`tests/test_retrieval_set.py` re-derives
+them, so a label cannot drift).
+
+```bash
+# one model per run; the server is started and stopped by the driver
+/usr/bin/python3 scripts/embed_eval.py \
+    --model ~/.local/share/models/bge-m3-f16.gguf --name bge-m3 --backend vulkan
+/usr/bin/python3 scripts/embed_eval.py \
+    --model ~/.local/share/models/nomic-embed-text-v1.5.f16.gguf \
+    --name nomic-embed-text-v1.5 --backend rocm
+
+/usr/bin/python3 scripts/embed_eval.py --table       # rebuild results/embeddings-table.md
+/usr/bin/python3 scripts/embed_eval.py --compare bge-m3@vulkan nomic-embed-text-v1.5@vulkan
+```
+
+Per-run detail lands in `results/embed-<stamp>-<name>/summary.json` (gitignored):
+model sha256, backend, prefixes, corpus/query hashes, timings, metrics and the
+rank of the first relevant passage per query. `results/embeddings-table.md` is
+tracked and is what the README section reproduces.
+
+Protocol notes:
+
+- **Task prefixes are per model.** nomic-embed-text is trained with
+  `search_query:` / `search_document:`; bge-m3 is not. The driver applies the
+  right pair per model name (`--query-prefix` / `--doc-prefix` override) and
+  records it — scoring nomic bare would turn a model comparison into a protocol
+  difference.
+- **Pooling is the model's own.** `--embedding` without `--pooling` lets llama.cpp
+  use the model default (CLS for bge-m3, mean for nomic).
+- **Both backends should agree on quality.** They did (identical metrics on
+  Vulkan and ROCm for both models); a backend that changes hit@1 is a bug, not a
+  speed difference.
+- **30 queries is a small sample.** One question moving changes hit@1 by 0.033;
+  quote the paired count (`--compare`) alongside the averages.

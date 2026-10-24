@@ -322,6 +322,39 @@ continuations. Re-scoring 200 `scandisent` items with a space-prefixed choice
 (0.940 → 0.965), so the boundary tokenisation is worth ~1–2 points on a binary
 task and does not explain the `mcf` collapse.
 
+## Finnish retrieval — embeddings (2026-10-24)
+
+Two embedding models on one Finnish retrieval set: 263 passages from 24 Finnish
+Wikipedia articles (CC BY-SA 4.0) and 30 hand-authored questions whose relevant
+passage is fixed by a rule rather than typed in by hand — a passage is relevant
+when it contains the query's answer string, and a test re-derives every label
+from that rule (`docs/retrieval/fi-2026-10/`, decisions in PLAN.md D11). Same
+corpus, same questions, pinned llama.cpp `5b59b83f4`, each model given the task
+prefixes it was trained with (nomic: `search_query:` / `search_document:`;
+bge-m3: none).
+
+| Model | Backend | hit@1 | hit@5 | hit@10 | MRR@10 | nDCG@10 | Passages/s | llama.cpp |
+|---|---|---|---|---|---|---|---|---|
+| bge-m3 | rocm | 0.867 | 0.967 | 1.000 | 0.910 | 0.925 | 88.5 | 5b59b83f4 |
+| bge-m3 | vulkan | 0.867 | 0.967 | 1.000 | 0.910 | 0.925 | 73.2 | 5b59b83f4 |
+| nomic-embed-text-v1.5 | rocm | 0.600 | 0.833 | 0.900 | 0.700 | 0.723 | 149.2 | 5b59b83f4 |
+| nomic-embed-text-v1.5 | vulkan | 0.600 | 0.833 | 0.900 | 0.700 | 0.723 | 153.7 | 5b59b83f4 |
+
+bge-m3 puts the answering passage first for 26 of 30 questions (nomic: 18), and
+the paired comparison is **11 queries better, 2 worse, 17 equal**
+(`scripts/embed_eval.py --compare bge-m3@vulkan nomic-embed-text-v1.5@vulkan`).
+Quality is identical on Vulkan and ROCm for both models — the backends differ
+only in throughput, where ROCm is 21% faster for bge-m3 (88.5 vs 73.2 passages/s)
+and level for nomic. Against that, nomic embeds ~2x faster and is 4x smaller on
+disk (274 MB vs 1,158 MB).
+
+Caveats: 30 queries is a small set — one question moving changes hit@1 by 0.033 —
+and the questions were authored in this repo, so this measures retrieval
+capability on a Finnish business vocabulary, not agreement with outside
+annotators. The corpus is encyclopedic prose, not invoices: a document class full
+of tables and headerless fragments is a separate question, and the RAG
+ingestion side measures that one (`scripts/probe_tables.py` there).
+
 ## Quick start
 
 The harness needs a Python 3 that can `import yaml` and, for the charts and the
@@ -397,6 +430,9 @@ What is pinned, and where:
 | `scripts/fetch_finbench_upstream.py` | refreshes the vendored upstream prompt templates |
 | `docs/finbench/` | upstream template snapshot (commit-pinned, sha256 per file) |
 | `scripts/make_charts.py` | regenerates the charts from the rollup (needs matplotlib) |
+| `scripts/make_retrieval_set.py` | builds the Finnish retrieval set from Wikipedia (CC BY-SA, sha256 per article) |
+| `scripts/embed_eval.py` | embeddings axis: runs llama-server, scores hit/MRR/nDCG, publishes the table |
+| `docs/retrieval/fi-2026-10/` | the committed retrieval set: corpus, hand-authored queries, manifest |
 | `scripts/make_social_preview.py` | regenerates the 1280×640 repository social card |
 | `tools/score_ll.cpp` | loglikelihood scorer for the FIN-bench axis, linked against the pinned llama.cpp |
 | `matrix.yaml` | the benchmark matrix and the run-parameter defaults |
@@ -501,7 +537,10 @@ metadata is in [CITATION.cff](CITATION.cff):
   it and publish the formulation / prompt-variant comparison.
 - **An English/general quality axis** — strict-JSON extraction, function
   calling, and a GSM8K-style math subset over the same cells.
-- **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.
+- **Embeddings** — measured on 2026-10-24: bge-m3 vs nomic-embed-text on a Finnish
+  retrieval set, both backends, prefixes per model (PLAN.md D11, table in the
+  Finnish-retrieval section above). What remains is a larger query set and a
+  document-shaped corpus rather than Wikipedia prose.
 - **A warm-cache TTFT column is not published** — the cold-request protocol replaced
   it on 2026-10-24 (both backends, `docs/RUNNING.md` §3c). Each backend now has two
   cold passes, so the latency medians are two-pass values with the run-to-run band

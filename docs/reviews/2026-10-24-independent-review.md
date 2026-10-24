@@ -21,6 +21,47 @@ problem (the harness talks only to `127.0.0.1`; the FIN-bench driver reads publi
 endpoints with timeouts and no token), and no correctness fault in the probe's timing maths or
 in the slot-erase mechanism.
 
+> **Resolution status (builder, 2026-10-24, verified at `17284cb`).** Every finding above is
+> closed on `main`, and the suite that was red at review time is green: 132 tests, 4 documented
+> skips on a clean checkout, both Python legs green in CI on the merge commit.
+>
+> - **B1** — ROCm cold was measured (`run-20261024-0930`, repeated as `-1749`) so the column
+>   carries one protocol per cell on both backends (`run-20261024-1812` Vulkan).
+>   `tests/test_rollup_protocol_consistency.py` now fails when a column mixes KV type or protocol
+>   across backends, so the state this review found itself in cannot recur silently.
+> - **B2** — §3c and §7 were rewritten from the run artifacts, and the *warm* side is checkable
+>   too: `results/ttft-per-request.csv` carries per-request data for both protocols and
+>   `tests/test_ttft_extract.py` parses §3c's markdown table and re-derives it from that extract.
+>   "mean and p50 agree" is narrowed to "within a few percent (worst 1.04x)", and the
+>   "`gen_tps` identical" claim now carries its one exception (−3.2%, Qwen3-Coder on Vulkan).
+> - **I1** — `matrix.yaml defaults.kv: f16` with the parser deriving it, pinned by
+>   `tests/test_defaults.py` and, from the data side, by `tests/test_doc_status_claims.py`.
+> - **I2** — `run.json` is stamped `partial: true` before the first cell and cleared only after
+>   the last; `consolidate()` skips partial runs.
+> - **I3** — every streaming row carries `[<kv> KV, <warm|cold> TTFT]`, enforced by the
+>   protocol-consistency test; legacy rows are relabelled `[q8_0 KV, warm TTFT]`.
+> - **I4** — both backends now have two clean cold passes. The measured band replaces both the
+>   single-pass disclosure and this review's target claim: cell `TTFT p50` moves −6.2…+1.5%
+>   (Vulkan) / −7.9…+0.2% (ROCm) between passes, median |Δ| 0.8% / 0.4%, with three cells moving
+>   3–8% (Poro 2 8B and Qwen3-Coder on Vulkan, gpt-oss on ROCm). The "−1.2…+2.1%" quoted at
+>   review time was measured against the contended 08:43 pass and understated it; §3c now carries
+>   the band as a table that a test recomputes from the extract.
+> - **I5** — `scripts/run_sweep.py --check` is the local-only drift guard (rebuilds the rollup in
+>   memory, exits 1 and names the offending rows). README and the workflow comment no longer claim
+>   the suite can rebuild the rollup on CI.
+> - **M1–M7** — closed: `slot_dir` required in cold mode, zero-erase refusal, protocol argument
+>   required, §3b note format corrected, `download_models.sh` in the layout, `server.log` handle
+>   closed, and §3c's slots-API sentence separates `POST` (needs `--slot-save-path`) from `GET`
+>   (needs `--slots`).
+> - **Missing evidence** — 5.1 (501 test), 5.2 (protocol-mix guard), 5.3 (tracked extracts: TTFT
+>   per request for both protocols, verbatim llama-bench logs, sampler support, plus
+>   `scripts/make_extracts.py --check`), 5.4 (ROCm cold measured), 5.5 (repeat passes measured),
+>   5.6 (status text pinned by `tests/test_doc_status_claims.py`), 5.7 (charts unchanged — the
+>   fingerprint test still passes and no bench row moved).
+> - **Residual, stated rather than fixed** — per-cell cold reproducibility is ~±8% worst case, not
+>   the ~2% the bench repeats support; power/temperature/memory remain window aggregates whose
+>   sample support is published but whose 5 Hz traces are not shipped.
+
 ---
 
 ## Evidence base (what was actually run)

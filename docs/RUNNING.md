@@ -93,8 +93,46 @@ Options (from `--help`). Run-parameter defaults come from `matrix.yaml` `default
 | `--force` | off | skip the idle gate (results flagged contaminated) |
 | `--rocm-override` | off | set `HSA_OVERRIDE_GFX_VERSION=11.5.0` (gfx1151 fallback, see §7) |
 | `--consolidate` | off | rebuild `consolidated.csv` + `table.md` from existing run dirs and exit; no GPU, no `--backend` needed |
+| `--probe-only` | off | re-run **only** the `llama-server` + TTFT probe phase (no `llama-bench`), for re-measuring TTFT with a different KV type; see §3b |
+| `--tag` | off | after a full sweep, create the annotated run tag — but only when the tracked results already match HEAD, otherwise the exact commands are printed |
 
-## 3b. Run the tests
+## 3b. Re-measuring one phase (`--probe-only`)
+
+`--probe-only` runs the per-cell sequence **without** `llama-bench`: idle gate, sampler,
+`llama-server` + TTFT probe, aggregate. It exists so a protocol change can be re-measured
+without paying for the bench phase again — the KV-type comparison in §7 is the motivating
+case:
+
+```
+/usr/bin/python3 scripts/run_sweep.py --backend vulkan --kv f16 --probe-only
+/usr/bin/python3 scripts/run_sweep.py --backend rocm   --kv f16 --probe-only
+```
+
+What a probe-only run publishes, and why it is not a full sweep:
+
+- `cell.json` carries `"probe_only": true`, an empty `bench` block and a `null`
+  `bench_window`; `phases.json` has no bench phase.
+- `consolidate()` emits **only** `tg_server_tps`, `ttft_ms` and `ttft_ms_p50` from it, with
+  `[<kv> KV, probe-only run]` appended to each note.
+- It deliberately does **not** emit `temp_c_max`, `vram_peak_gib`/`mem_peak_gib`,
+  `power_w_*` or `tok_per_w`: those describe a whole cell, and a probe-only cell window has
+  no bench heat soak, so its peak temperature and residency understate the full-sweep cell
+  they are published from. Those columns stay attributed to the last full sweep.
+- Because latest-wins is per metric, the streaming columns move to the new run while the
+  bench, heat and memory columns keep pointing at the full sweep. Each rollup row carries
+  its own `run_id`, so the provenance of every column is visible.
+- A probe-only pass is still a `--cells`-complete run (not `partial`), so it does update
+  the tracked rollup — that is the point. A `--cells` subset remains excluded (M-2).
+
+**First use (2026-10-23):** the ten-cell f16 re-probe —
+`results/run-20261023-1140` (Vulkan) and `-1159` (ROCm), both `--kv f16 --probe-only` —
+answered the TTFT protocol question and doubles as the run-to-run noise measurement:
+`tg_server_tps` within −0.2…+1.4%, `ttft_ms` −4.4…+6.5%, `ttft_ms_p50` −5.9…+8.1% over
+20 cell/backend pairs (§7). The streaming columns in `results/table.md` and the README
+table now come from these two runs, each row keeping its own `run_id`; the bench, power
+and memory columns stay attributed to the 2026-10-22 full sweeps.
+
+## 3c. Run the tests
 
 The harness has a small stdlib-`unittest` suite (no pytest dependency) covering the
 `llama-bench` table parser, `consolidate()` idempotency (no duplicate rows) and the
@@ -112,8 +150,8 @@ The harness has a small stdlib-`unittest` suite (no pytest dependency) covering 
 3. **Resource sampler** — spawns `sampler.py` writing `resources.csv` at 5 Hz (sysfs only).
 4. **`llama-bench`** — for each pp point (`-n 0`) plus one tg run (`-p 0 -n 512`), `-ngl 99
    -t 16 -r <repeats>`; output → `bench.log`. Runs at the **model-default context** (see §7).
-5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk q8_0 -ctv
-   q8_0 -np 1 --alias <cell>`), waits on `/health` (timeout scales with model size:
+5. **`llama-server` + probe** — starts the server (`-c <ctx> -ngl 99 -fa on -ctk <kv> -ctv <kv> -np 1 --alias <cell>`,
+   `--kv` defaulting to `q8_0`; the published 2026-10-22/23 runs used `f16`), waits on `/health` (timeout scales with model size:
    `900 + size_gib*15` s), then runs `ttft_probe.py`: 1 untimed warmup request, then `N`
    timed **streaming** 512-token completions (temperature 0, **`ignore_eos: true`**) →
    `ttft.json`. TTFT = time to first streamed token; gen_tps = tokens / (t_end − t_first),
@@ -240,6 +278,21 @@ so a stale figure cannot ship with fresh numbers.
   work. Do not compare them across cells or backends, and any future TTFT measurement must state its
   KV type. Per-request values are in `ttft.json`. This supersedes the 2026-10-02 note that described
   "first request fast, next two slow": the discriminator is the preceding generation, not the prompt.
+  Re-measuring the column for one KV type is what `--probe-only` exists for (§3b); pass `--kv`
+  explicitly so the run's `run.json` states the protocol it used.
+
+  **The published column is f16 KV, and a ten-cell re-probe confirms it (2026-10-23).** Both
+  2026-10-22 sweeps ran with `--kv f16` — `sweep.log` records the argv and `run.json` stamps
+  `kv_cache: f16` — so the q8 arm above was a single-variable experiment, never the published
+  protocol. The probe-only pass (`run-20261023-1140` Vulkan, `run-20261023-1159` ROCm, both
+  `--kv f16 --probe-only`, same kernel/Mesa/llama.cpp) re-measured all ten cells and reproduced
+  the column instead of moving it: `tg_server_tps` within **−0.2…+1.4%** (mean |Δ| 0.18%),
+  `ttft_ms` mean within **−4.4…+6.5%** and `ttft_ms_p50` within **−5.9…+8.1%** (mean |Δ| 1.7% /
+  2.0%), over 20 cell/backend pairs. Two conclusions: the TTFT column needs no protocol change,
+  and the ~2% noise floor the README quotes is now measured rather than assumed. What f16 does
+  not remove is the stall itself — the 27B Q6_K cell measures 818 / 1641 / 818 ms, a ~0.8 s
+  middle request — so the mean stays inflated on that cell and the median remains the figure to
+  quote. A cold-request protocol is the remaining option and has not been run.
 - **Numbers are stack-stamped, and the published tables were re-measured.** The tracked
   tables now come from the 2026-10-22 sweeps: kernel 7.2.10 / Mesa 26.2.4 (`docs/env.md`).
   The 2026-10-02/03 rows were measured on kernel 7.2.8 / Mesa 26.2.3 and stay in the rollup
@@ -257,16 +310,33 @@ so a stale figure cannot ship with fresh numbers.
   and the power trace are logged so a throttled run is still a *reported* run — just read the
   sustained (not burst) tok/s.
 
-## 8. Recording a run (reproducibility — manual for now)
+## 8. Recording a run (tag is derived; the commit stays yours)
 
-The driver does **not** yet auto-commit/tag a run (an open item — see
-[the 2026-10-04 independent review](reviews/2026-10-04-independent-review.md)). Until
-that lands, do it by hand after a successful sweep:
+The driver never commits — an unattended sweep must not write to git — but it no longer
+leaves the tag to memory either. At the end of a sweep that covers the whole matrix it:
+
+1. derives the next free tag for the day (`next_run_tag()`: `run-YYYYMMDD-N`, continuing
+   from the highest existing `N` for that date),
+2. builds the message from the run (`tag_message()`: backend, cell count, harness 7-char,
+   llama.cpp 9-char, kernel / Mesa, KV type, and whether it was probe-only),
+3. stamps the name into `run.json` → `tag`, and
+4. logs the two commands to run:
 
 ```
-git add results/ && git commit -m "run: $(ls -1t results | head -1)" \
-  && git tag run-$(date +%Y%m%d)-<n>
+next tag: run-20261023-1
+record it: git add results/ && git commit -m "results: run-20261023-1015 (vulkan)" \
+  && git tag -a run-20261023-1 -m "Vulkan probe-only sweep — 10 cells, ..."
 ```
+
+`--tag` creates the annotated tag directly **only when the tracked `results/` and `charts/`
+already match HEAD** (`results_match_head()`); otherwise it refuses and prints the same
+commands, because tagging HEAD with a rollup that is still uncommitted would point at a
+commit that does not contain the numbers. That is not a theoretical worry: the 2026-10-22
+sweeps shipped untagged for exactly that reason (hand-typed step, forgotten at the end of a
+long run) and were tagged retroactively on 2026-10-23.
+
+Before the fix, the message was whatever the operator typed; now every run's tag says which
+harness, stack and KV type produced it.
 
 CPU power state: the governor is deliberately **not** pinned — the runs are meant to describe
 the box as it actually behaves, and `run.json` → `cpu_power` records the governor/EPP each run

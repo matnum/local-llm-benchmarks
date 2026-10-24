@@ -348,6 +348,13 @@ def build_parser(defaults):
     ap.add_argument("--consolidate", action="store_true",
                     help="rebuild results/consolidated.csv + results/table.md from "
                          "existing run dirs, then exit (no GPU work)")
+    ap.add_argument("--probe-only", action="store_true",
+                    help="re-run only the llama-server + TTFT probe phase (no llama-bench) "
+                         "and publish only the streaming columns; use to re-measure TTFT "
+                         "with a different KV type without repeating the whole sweep")
+    ap.add_argument("--tag", action="store_true",
+                    help="after a full sweep, create the run tag — only when the tracked "
+                         "results already match HEAD, otherwise the commands are printed")
     return ap
 
 
@@ -406,6 +413,7 @@ def main():
             "ctx_server": args.ctx,
             "ctx_bench": "model-default (4096)",
             "kv_cache": args.kv,
+            "probe_only": args.probe_only,
             **stack_stamp(),
             "note_bench_ctx": "llama-bench in pinned build 5b59b83f4 has no -c/--ctx; "
                               "bench tok/s measured at model default ctx, not ctx_server",
@@ -464,13 +472,20 @@ def main():
                                     f"{cdir}/resources.csv", str(args.power_hz)],
                                    start_new_session=True, env=env)
         phases = {}
+        bench = {}
         try:
-            phases["bench_start"] = time.time()
-            bench = bench_cell(env_binpath(args), cell, args.repeats,
-                               pp_tokens, args.tg_tokens, cdir, env,
-                               args.threads, args.ngl)
-            phases["bench_end"] = time.time()
-            log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
+            if args.probe_only:
+                # Phase re-measure: no llama-bench, so cell.json carries no bench
+                # block, no bench window, and consolidate() publishes only the
+                # streaming columns from this run.
+                phases["probe_start"] = time.time()
+            else:
+                phases["bench_start"] = time.time()
+                bench = bench_cell(env_binpath(args), cell, args.repeats,
+                                   pp_tokens, args.tg_tokens, cdir, env,
+                                   args.threads, args.ngl)
+                phases["bench_end"] = time.time()
+                log(f"  bench: { {k: v['mean'] for k, v in bench.items()} }")
             ttft, p0, p1 = probe_cell(env_binpath(args), cell, args.ctx, args.port,
                                       cdir, args.repeats, args.tg_tokens, env,
                                       args.threads, args.ngl, args.warmup, args.kv)
@@ -482,15 +497,19 @@ def main():
         json.dump(phases, open(f"{cdir}/phases.json", "w"), indent=1)
 
         rows = list(csv.DictReader(open(f"{cdir}/resources.csv")))
+        first = phases.get("bench_start", phases["probe_start"])
         res = {
-            "bench_window": window_stats(rows, phases["bench_start"], phases["bench_end"]),
+            # A probe-only run has no bench phase: None, not a window spanning nothing.
+            "bench_window": (window_stats(rows, phases["bench_start"], phases["bench_end"])
+                             if "bench_start" in phases else None),
             "probe_window": window_stats(rows, phases["probe_start"], phases["probe_end"]),
-            "cell_window": window_stats(rows, phases["bench_start"], phases["done"]),
+            "cell_window": window_stats(rows, first, phases["done"]),
         }
         tg_srv = ttft["gen_tps_mean"]
         pw = (res["probe_window"] or {}).get("power_w_mean")
         summary = {
             "cell": cell["id"], "backend": args.backend, "run": run_id, "kv": args.kv,
+            "probe_only": args.probe_only,
             "model": cell["model"], "quant": cell["quant"], "arch": cell["arch"],
             "size_gib": cell["size_gib"], "bench": bench, "ttft": ttft,
             "resources": res,
@@ -500,6 +519,32 @@ def main():
 
     if tracks_rollup([c["id"] for c in cells], [c["id"] for c in matrix["cells"]]):
         consolidate()
+        # M8: record the run. The driver still never commits — an unattended sweep
+        # must not write to git — but it now names the tag, stamps it into run.json
+        # and creates it when HEAD already contains the results (--tag). Before
+        # this, the tag was hand-typed and the 2026-10-22 sweeps simply never got
+        # one, leaving the published numbers without the provenance every earlier
+        # sweep had.
+        planned = next_run_tag(repo_tags(REPO) + planned_tags(REPO),
+                               time.strftime("%Y%m%d"))
+        msg = tag_message(args.backend, len(cells), harness_commit, commit,
+                          meta.get("kernel", "unknown"), meta.get("mesa", "unknown"),
+                          args.kv, args.probe_only)
+        rj = f"{rdir}/run.json"
+        with open(rj) as f:
+            stamped = json.load(f)
+        stamped["tag"] = planned
+        json.dump(stamped, open(rj, "w"), indent=1)
+        if args.tag and results_match_head(REPO):
+            subprocess.run(["git", "-C", REPO, "tag", "-a", planned, "-m", msg], check=True)
+            log(f"tagged {planned}")
+        else:
+            if args.tag:
+                log("--tag: tracked results/charts differ from HEAD — refusing to tag a "
+                    "commit that does not contain them")
+            log(f"next tag: {planned}")
+            log(f'record it: git add results/ && git commit -m "results: {run_id} '
+                f'({args.backend})" && git tag -a {planned} -m "{msg}"')
     else:
         # A one-cell probe must not rewrite the published rollup: consolidate()
         # scans every run dir, so a partial run's rows would silently become the
@@ -507,13 +552,6 @@ def main():
         # and every README number pinned to them.
         log(f"partial sweep ({len(cells)}/{len(matrix['cells'])} cells): tracked rollup, "
             f"table and charts left untouched (cell.json in the run dir has the numbers)")
-    # M8 (tracked, not yet implemented): PLAN §3 says every sweep is "git commit +
-    # tag run-YYYYMMDD-N" with llama.cpp commit + env fingerprint, and fixes the CPU
-    # governor. The driver does NOT do this yet. Until implemented, run manually after
-    # a sweep:
-    #   git add results/ && git commit -m "run: <id>" \
-    #     && git tag run-$(date +%Y%m%d)-$(n)
-    # and fix the governor (e.g. `cpupower frequency-set -g performance`).
     log(f"done -> {rdir} (see results/table.md)")
 
 
@@ -586,6 +624,71 @@ def tracks_rollup(selected_ids, all_ids):
     return set(selected_ids) == set(all_ids)
 
 
+def next_run_tag(existing, date):
+    """The next free ``run-YYYYMMDD-N`` for `date`, given the tag names that exist.
+
+    Pure so the sequencing is testable without a git repo. Non-numeric suffixes and
+    tags for other dates are ignored; the first tag of a day is ``-1``.
+    """
+    used = set()
+    for name in existing:
+        m = re.fullmatch(rf"run-{date}-(\d+)", str(name).strip())
+        if m:
+            used.add(int(m.group(1)))
+    return f"run-{date}-{max(used) + 1 if used else 1}"
+
+
+def tag_message(backend, cells, harness, llama, kernel, mesa, kv, probe_only):
+    """The annotated-tag message for a sweep, in the style of the existing run tags."""
+    name = {"vulkan": "Vulkan", "rocm": "ROCm"}.get(backend, backend)
+    kind = "probe-only sweep" if probe_only else "full sweep"
+    return (f"{name} {kind} — {cells} cells, harness {(harness or 'unknown')[:7]}, "
+            f"llama.cpp {(llama or 'unknown')[:9]}, {kernel} / {mesa}, KV {kv}")
+
+
+def repo_tags(repo):
+    """The repo's ``run-*`` tag names, or [] when git is unavailable."""
+    try:
+        return subprocess.run(["git", "-C", repo, "tag", "--list", "run-*"],
+                              capture_output=True, text=True).stdout.split()
+    except Exception:
+        return []
+
+
+def planned_tags(repo):
+    """Tag names already stamped into run dirs by sweeps that have not been tagged yet.
+
+    A sweep stamps its intended tag into run.json and then waits for a human to
+    commit, so two sweeps back to back would both derive the same name. Counting the
+    pending names keeps the sequence honest without creating a tag on a commit that
+    does not contain the data.
+    """
+    names = []
+    for rj in glob.glob(f"{repo}/results/run-*/*/run.json"):
+        try:
+            with open(rj) as f:
+                name = json.load(f).get("tag")
+        except (OSError, ValueError):
+            continue
+        if name:
+            names.append(name)
+    return names
+
+
+def results_match_head(repo):
+    """True when tracked results/charts in the worktree equal HEAD's.
+
+    A tag is only worth creating when the commit it lands on actually contains the
+    numbers: tagging HEAD with the new (uncommitted) rollup in the tree would point
+    at a commit without the data, which is the failure mode the manual step had.
+    """
+    for path in ("results", "charts"):
+        if subprocess.run(["git", "-C", repo, "diff", "--quiet", "HEAD", "--", path]
+                          ).returncode != 0:
+            return False
+    return True
+
+
 def consolidate(repo=REPO):
     """Rebuild results/consolidated.csv + results/table.md from all run dirs."""
     rows = []
@@ -607,7 +710,13 @@ def consolidate(repo=REPO):
             res = s["resources"]
             base = {"run_id": s["run"], "backend": s["backend"], "cell": s["cell"],
                     "model": s["model"], "quant": s["quant"], "size_gib": s["size_gib"]}
-            for test, stats in s["bench"].items():
+            # A probe-only run re-measures one phase, so it publishes the streaming
+            # columns only. Its cell_window covers the probe alone (no bench heat
+            # soak), so temp/vram/mem/tok_per_w from it would understate the
+            # full-sweep cell those numbers are published from.
+            probe_only = bool(s.get("probe_only"))
+            kvnote = f" [{s.get('kv', '?')} KV, probe-only run]" if probe_only else ""
+            for test, stats in ({} if probe_only else s["bench"]).items():
                 reps = stats.get("repeats")
                 if isinstance(reps, list):      # legacy cell.json: parsed rows list
                     reps = len(reps)
@@ -620,10 +729,10 @@ def consolidate(repo=REPO):
             nreq = len(s["ttft"].get("requests", []))
             rows.append({**base, "metric": "tg_server_tps", "unit": "t/s",
                          "value": s["ttft"]["gen_tps_mean"],
-                         "note": f"streaming, mean of {nreq}"})
+                         "note": f"streaming, mean of {nreq}{kvnote}"})
             rows.append({**base, "metric": "ttft_ms", "unit": "ms",
                          "value": s["ttft"]["ttft_ms_mean"],
-                         "note": f"mean of {nreq}"})
+                         "note": f"mean of {nreq}{kvnote}"})
             # Mean alone misleads when the per-request spread is wide: on Vulkan
             # the first timed request hits the prefill prediction and requests
             # 2-3 take 2-12x longer to first token, while ROCm runs flat. Ship the
@@ -632,13 +741,13 @@ def consolidate(repo=REPO):
                 rows.append({**base, "metric": "ttft_ms_p50", "unit": "ms",
                              "value": s["ttft"]["ttft_ms_p50"],
                              "note": f"median of {nreq}; compare with ttft_ms to "
-                                     "gauge request-to-request spread"})
-            for wname in ("probe_window", "bench_window"):
+                                     "gauge request-to-request spread" + kvnote})
+            for wname in ([] if probe_only else ("probe_window", "bench_window")):
                 w = res.get(wname) or {}
                 if w:
                     rows.append({**base, "metric": f"power_w_{wname[:5]}", "unit": "W",
                                  "value": w["power_w_mean"], "note": f"max {w['power_w_max']}"})
-            cw = res.get("cell_window") or {}
+            cw = (res.get("cell_window") or {}) if not probe_only else {}
             if cw:
                 rows.append({**base, "metric": "temp_c_max", "unit": "C",
                              "value": cw["temp_c_max"], "note": ""})
@@ -654,7 +763,7 @@ def consolidate(repo=REPO):
                     rows.append({**base, "metric": "mem_peak_gib", "unit": "GiB",
                                  "value": cw["mem_gib_max"],
                                  "note": "peak resident GPU memory (VRAM + GTT)"})
-            if s.get("tok_per_w"):
+            if s.get("tok_per_w") and not probe_only:
                 rows.append({**base, "metric": "tok_per_w", "unit": "t/s/W",
                              "value": s["tok_per_w"], "note": "server tg / probe W mean"})
 

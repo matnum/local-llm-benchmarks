@@ -140,26 +140,26 @@ power, temperature, per-request TTFT, benchmark context — is in
 
 | Cell | Backend | pp2048 t/s | tg512 t/s | server tg t/s | TTFT p50 ms | tok/s/W | peak GPU GiB |
 |---|---|---|---|---|---|---|---|
-| `qwen3-4b-q8_0` | vulkan | 1857.9 | 48.89 | 48.09 | 55.3 | 0.57 | 5.77 |
-| `qwen3-4b-q8_0` | rocm | 2329.5 | 46.83 | 46.23 | 43.5 | 0.54 | 5.53 |
-| `poro2-8b-q8_0` | vulkan | 918.4 | 27.16 | 26.83 | 127.9 | 0.32 | 9.26 |
-| `poro2-8b-q8_0` | rocm | 1239.1 | 26.59 | 26.48 | 64.4 | 0.31 | 8.89 |
-| `eurollm-9b-q8_0` | vulkan | 791.0 | 23.57 | 23.25 | 140.9 | 0.27 | 10.67 |
-| `eurollm-9b-q8_0` | rocm | 1060.1 | 22.91 | 22.90 | 85.3 | 0.27 | 10.30 |
-| `qwen3.8-27b-q5_k_xl` | vulkan | 290.3 | 10.56 | 10.48 | 507.9 | 0.12 | 20.09 |
-| `qwen3.8-27b-q5_k_xl` | rocm | 308.4 | 10.37 | 10.33 | 338.1 | 0.12 | 19.59 |
-| `qwen3.8-27b-q6_k` | vulkan | 273.7 | 9.98 | 9.91 | 1211.4 | 0.12 | 21.13 |
-| `qwen3.8-27b-q6_k` | rocm | 308.6 | 9.83 | 9.80 | 358.1 | 0.12 | 20.53 |
-| `qwen3-32b-q5_k_m` | vulkan | 243.1 | 9.71 | 9.66 | 431.0 | 0.11 | 24.01 |
-| `qwen3-32b-q5_k_m` | rocm | 292.9 | 9.54 | 9.51 | 225.0 | 0.11 | 23.68 |
-| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1110.0 | 74.86 | 73.55 | 179.6 | 0.90 | 24.39 |
-| `qwen3-coder-30b-a3b-q6_k` | rocm | 1246.9 | 61.41 | 60.05 | 106.4 | 0.69 | 24.37 |
-| `qwen3.5-35b-a3b-q6_k` | vulkan | 1062.4 | 62.30 | 61.12 | 186.9 | 0.80 | 27.63 |
-| `qwen3.5-35b-a3b-q6_k` | rocm | 1054.7 | 51.32 | 50.53 | 129.2 | 0.59 | 27.40 |
-| `poro2-70b-q4_k_m` | vulkan | 81.0 | 5.25 | 5.24 | 1179.4 | 0.06 | 42.52 |
-| `poro2-70b-q4_k_m` | rocm | 127.1 | 5.18 | 5.18 | 545.4 | 0.06 | 42.15 |
-| `gpt-oss-120b-mxfp4` | vulkan | 735.3 | 55.30 | 54.02 | 370.3 | 0.63 | 59.70 |
-| `gpt-oss-120b-mxfp4` | rocm | 882.6 | 50.91 | 48.88 | 218.9 | 0.59 | 59.31 |
+| `qwen3-4b-q8_0` | vulkan | 1857.9 | 48.89 | 48.15 | 54.8 | 0.57 | 5.77 |
+| `qwen3-4b-q8_0` | rocm | 2329.5 | 46.83 | 46.31 | 42.2 | 0.54 | 5.53 |
+| `poro2-8b-q8_0` | vulkan | 918.4 | 27.16 | 26.75 | 120.0 | 0.32 | 9.26 |
+| `poro2-8b-q8_0` | rocm | 1239.1 | 26.59 | 26.46 | 64.5 | 0.31 | 8.89 |
+| `eurollm-9b-q8_0` | vulkan | 791.0 | 23.57 | 23.30 | 143.0 | 0.27 | 10.67 |
+| `eurollm-9b-q8_0` | rocm | 1060.1 | 22.91 | 22.91 | 85.0 | 0.27 | 10.30 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 290.3 | 10.56 | 10.48 | 509.7 | 0.12 | 20.09 |
+| `qwen3.8-27b-q5_k_xl` | rocm | 308.4 | 10.37 | 10.32 | 336.9 | 0.12 | 19.59 |
+| `qwen3.8-27b-q6_k` | vulkan | 273.7 | 9.98 | 9.91 | 1207.3 | 0.12 | 21.13 |
+| `qwen3.8-27b-q6_k` | rocm | 308.6 | 9.83 | 9.81 | 357.9 | 0.12 | 20.53 |
+| `qwen3-32b-q5_k_m` | vulkan | 243.1 | 9.71 | 9.66 | 428.3 | 0.11 | 24.01 |
+| `qwen3-32b-q5_k_m` | rocm | 292.9 | 9.54 | 9.52 | 224.9 | 0.11 | 23.68 |
+| `qwen3-coder-30b-a3b-q6_k` | vulkan | 1110.0 | 74.86 | 71.24 | 181.2 | 0.90 | 24.39 |
+| `qwen3-coder-30b-a3b-q6_k` | rocm | 1246.9 | 61.41 | 60.12 | 104.0 | 0.69 | 24.37 |
+| `qwen3.5-35b-a3b-q6_k` | vulkan | 1062.4 | 62.30 | 61.11 | 188.2 | 0.80 | 27.63 |
+| `qwen3.5-35b-a3b-q6_k` | rocm | 1054.7 | 51.32 | 50.54 | 128.6 | 0.59 | 27.40 |
+| `poro2-70b-q4_k_m` | vulkan | 81.0 | 5.25 | 5.24 | 1183.6 | 0.06 | 42.52 |
+| `poro2-70b-q4_k_m` | rocm | 127.1 | 5.18 | 5.18 | 546.2 | 0.06 | 42.15 |
+| `gpt-oss-120b-mxfp4` | vulkan | 735.3 | 55.30 | 54.02 | 366.8 | 0.63 | 59.70 |
+| `gpt-oss-120b-mxfp4` | rocm | 882.6 | 50.91 | 50.04 | 201.6 | 0.59 | 59.31 |
 
 **Vulkan leads `tg512` on 10 of 10 cells — decisively on 6 (by 2.1–18.0%), with
 4 ties — and ROCm leads `pp2048` on 9 of 10 (by 6.2–56.8%), with 1 tie.**
@@ -202,8 +202,8 @@ logged per run.
 > [docs/RUNNING.md](docs/RUNNING.md) §7 before quoting it).** Each timed request starts
 > from an **erased KV cache**, so the number is full prompt prefill + first token for a
 > fresh request — not first-token latency with the previous turn still cached. It is
-> therefore *larger* than a warm-cache figure (20–493% above the pre-2026-10-24 warm
-> column on Vulkan, 58–397% on ROCm) and it is the same quantity on both backends. It
+> therefore *larger* than a warm-cache figure (21–495% above the pre-2026-10-24 warm
+> column on Vulkan, 58–386% on ROCm) and it is the same quantity on both backends. It
 > also removes the request-to-request spread that made the old column volatile: the
 > mean/p50 ratio fell from up to 2.11 to at most 1.04, and the median per-request spread
 > from 53 ms to 3 ms. The residual spread is model-specific — the 27B Q6_K cell still
@@ -421,8 +421,8 @@ What is pinned, and where:
   they were measured at the same context.
 - **TTFT measures a cold request, and that is a different number from a warm one.**
   Every timed request starts from an erased KV cache (both backends), so the column is
-  full prompt prefill + first token: 20–493% above the pre-2026-10-24 warm column on
-  Vulkan and 58–397% on ROCm. That is why it is stable (mean/p50 ≤ 1.04, median spread
+  full prompt prefill + first token: 21–495% above the pre-2026-10-24 warm column on
+  Vulkan and 58–386% on ROCm. That is why it is stable (mean/p50 ≤ 1.04, median spread
   3 ms) where the warm column was not (mean/p50 up to 2.11, spread up to 823 ms): the
   KV bookkeeping that used to land inside TTFT after a 512-token generation is now paid
   by an untimed erase. It does not make the cells equal — the 27B Q6_K cell is 1.21 s on
@@ -440,14 +440,18 @@ What is pinned, and where:
   `tg512` stays inside −2.8…+0.9%. Never mix rows from two stacks in one
   comparison.
 - **No error bars.** Three repeats catch a broken run; they do not support a 1%
-  claim. The band is measured, not assumed. Throughput: a ten-cell warm re-probe moved
-  `server tg` by −0.2…+1.4% (mean |Δ| 0.18%); the cold pass reproduced the same
-  `server tg` within ±0.3% on Vulkan and ±0.4% mean on ROCm (one cell, gpt-oss on ROCm,
-  at −2.7%). Latency: two Vulkan cold passes agree on `TTFT p50` within −1.2…+2.1%, and
-  ROCm has a single cold pass. Differences under ~2% are within noise for this setup.
-  Contention shows up in `server tg` first (a contended pass read the 4B cell 17% low
-  while its TTFT p50 moved 0.5%) — the driver cannot tell you another process grabbed
-  the GPU.
+  claim. The band is measured, not assumed — and repeating a whole pass widens it
+  past the tables' 2% tie rule. Two cold passes per backend (2026-10-24:
+  `run-20261024-0910` → `-1812` on Vulkan, `-0930` → `-1749` on ROCm) moved
+  `server tg` by −3.1…+0.2% per cell on Vulkan and −0.1…+2.4% on ROCm (median |Δ|
+  0.1% on both), and `TTFT p50` by −6.2…+1.5% (median |Δ| 0.8%) and −7.9…+0.2%
+  (median |Δ| 0.4%). The medians reproduce; three cells do not — Qwen3-Coder-30B-A3B
+  on Vulkan (−3.1% `server tg`), Poro 2 8B on Vulkan and gpt-oss on ROCm (both
+  ~6–8% on `TTFT p50`). Differences under ~2% are within noise for the 3-repeat
+  bench numbers; a per-cell streaming figure that moved 3–8% between identical quiet
+  passes is not a signal. Contention shows up in `server tg` first (a contended pass
+  read the 4B cell 17% low while its TTFT p50 moved 0.5%) — the driver cannot tell
+  you another process grabbed the GPU.
 - **FIN-bench is one comparable formulation.** `cf` at prompt variant `p0`
   only. `mcf`/`p0` exists for a single cell as a documented negative result —
   it is not a like-for-like scale — and `p1`–`p4` are unmeasured; formulation
@@ -499,9 +503,10 @@ metadata is in [CITATION.cff](CITATION.cff):
   calling, and a GSM8K-style math subset over the same cells.
 - **Embeddings** — bge-m3 vs nomic-embed-text on a Finnish retrieval set.
 - **A warm-cache TTFT column is not published** — the cold-request protocol replaced
-  it on 2026-10-24 (both backends, `docs/RUNNING.md` §3c). What a repeat would add is a
-  second cold pass on ROCm: the latency noise band is measured on Vulkan only
-  (−1.2…+2.1% across two passes), so the ROCm medians are single-pass.
+  it on 2026-10-24 (both backends, `docs/RUNNING.md` §3c). Each backend now has two
+  cold passes, so the latency medians are two-pass values with the run-to-run band
+  quoted above; a third pass would tighten the three cells that move 3–8%, which is
+  GPU time nobody has spent yet.
 - **Wider matrix.** One-time downloads, not yet swept: gpt-oss-20b (MXFP4),
   Qwen3-30B-A3B (Q4_K_M), Llama 3.1 8B (Q8_0), Mistral Small 3.2 24B (Q4_K_M),
   Gemma 3 27B (Q4_K_M), Llama 3.3 70B (Q4_K_M).

@@ -159,31 +159,46 @@ the published runs are `f16` KV *and* cold.
 Why it exists, measured on three cells (3×512-token requests, f16 KV; the full ten-cell
 per-request table is in §7). Both sides of the comparison are tracked per request in
 [`results/ttft-per-request.csv`](../results/ttft-per-request.csv) — warm rows from
-`run-20261023-1140`/`-1159` (the column published until 2026-10-24), cold rows from
-`run-20261024-0910`/`-0930` — and `tests/test_ttft_extract.py` checks this table against
-that file, so it cannot be retyped from memory again:
+`run-20261023-1140`/`-1159` (the column published until 2026-10-24), cold rows from the
+published passes `run-20261024-1812` (Vulkan) / `-1749` (ROCm), with the earlier passes
+`-0910` / `-0930` kept for the run-to-run band below — and `tests/test_ttft_extract.py`
+checks this table against that file, so it cannot be retyped from memory again:
 
 | cell | backend | warm per request (ms) | warm spread | cold per request (ms) | cold spread |
 |---|---|---|---|---|---|
-| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 55.3 / 53.4 / 55.6 | 2.2 |
-| `qwen3-4b-q8_0` | rocm | 23.4 / 31.2 / 24.8 | 7.8 | 43.5 / 43.5 / 43.0 | 0.5 |
-| `qwen3-32b-q5_k_m` | vulkan | 104.9 / 186.7 / 185.7 | 81.8 | 405.7 / 431.9 / 431.0 | 26.2 |
-| `qwen3.8-27b-q5_k_xl` | vulkan | 143.3 / 422.0 / 427.7 | 284.4 | 479.8 / 507.9 / 512.0 | 32.2 |
+| `qwen3-4b-q8_0` | vulkan | 22.5 / 80.0 / 27.6 | 57.5 | 53.8 / 54.8 / 55.4 | 1.6 |
+| `qwen3-4b-q8_0` | rocm | 23.4 / 31.2 / 24.8 | 7.8 | 42.2 / 42.2 / 42.7 | 0.5 |
+| `qwen3-32b-q5_k_m` | vulkan | 104.9 / 186.7 / 185.7 | 81.8 | 401.0 / 431.7 / 428.3 | 30.7 |
+| `qwen3.8-27b-q5_k_xl` | vulkan | 143.3 / 422.0 / 427.7 | 284.4 | 481.6 / 509.7 / 514.0 | 32.4 |
 
-`gen_tps` was unchanged on a clean pass — the ten-cell cold runs reproduce the warm runs'
-`server tg` within ±0.3% on Vulkan and ±0.4% mean on ROCm (one cell, gpt-oss on ROCm, −2.7%)
-— so the protocol changes only what TTFT measures. The cold number is **larger** than a warm
+`gen_tps` is unchanged by the protocol — on the four published cold passes `server tg` sits
+within ±0.4% per cell of the warm runs on ROCm, and within ±0.3% on Vulkan apart from one
+cell (Qwen3-Coder-30B-A3B, −3.2%) — so the protocol changes only what TTFT measures. The
+cold number is **larger** than a warm
 first request because it includes the full prompt prefill: it is "time to first token for a
 fresh request", which is what a user sees, rather than "time to first token when the cache
 happens to hold the previous turn". `cache_prompt: false` was tried first and rejected: it
 re-prefills the prompt but still pays the previous generation's KV eviction, so it was both
 slower and just as noisy (27B: 480 / 511 / 702 ms).
 
+**Repeatability.** Each backend now has two clean cold passes on the same stack, and the
+band between them is the honest noise floor for a per-cell streaming figure (recomputed
+from the extract by `make_extracts.py --stats`, pinned by `tests/test_ttft_extract.py`):
+
+| backend | passes compared | `TTFT p50` per cell | median \|Δ\| | worst cell | `server tg` |
+|---|---|---|---|---|---|
+| vulkan | `run-20261024-0910` → `run-20261024-1812` | −6.2…+1.5% | 0.8% | `poro2-8b-q8_0` −6.2% | −3.1…+0.2% |
+| rocm | `run-20261024-0930` → `run-20261024-1749` | −7.9…+0.2% | 0.4% | `gpt-oss-120b-mxfp4` −7.9% | −0.1…+2.4% |
+
+The medians reproduce, the individual cells do not: 3 of 20 cell/backend pairs move
+3–8% between two identical quiet passes, so a per-cell cold median is good to roughly
+±8% on the worst cell and ~1% typically — not the ±2% the bench repeats support.
+
 Cold is stable, not identical across models: the 27B Q6_K cell still takes 1.21 s to first
 token on Vulkan (0.36 s on ROCm) because prefilling the 46-token prompt on a 20 GiB dense
 model costs that much. And a contended pass shows it in `gen_tps` before TTFT — the 08:43
 Vulkan pass (`superseded-contended-20261024-0843`) read the 4B cell at 39.85 t/s against
-48.09 clean, while its p50 moved 0.5%.
+48.15 in the clean 09:10 pass, while its p50 moved 0.5%.
 
 Reproduce a cold pass without re-running the bench phase:
 
@@ -356,7 +371,8 @@ so a stale figure cannot ship with fresh numbers.
   Since 2026-10-24 both backends are measured with `--ttft-protocol cold`: the probe erases the
   slot's KV cache before every timed request (§3c), so each request pays full prompt prefill +
   first token from an empty cache and nothing else. The published column comes from
-  `run-20261024-0910` (Vulkan) and `run-20261024-0930` (ROCm), and every streaming row in the
+  `run-20261024-1812` (Vulkan) and `run-20261024-1749` (ROCm) — the second quiet pass on
+  each backend — and every streaming row in the
   rollup says which protocol it carries (`[<kv> KV, <warm|cold> TTFT]`).
 
   Per-request values, clean Vulkan pass (3 × 512-token requests) — the same data,
@@ -366,24 +382,27 @@ so a stale figure cannot ship with fresh numbers.
 
   | cell | warm p50 (pre-2026-10-24) | cold per request (ms) | cold p50 |
   |---|---|---|---|
-  | qwen3-4b-q8_0 | 27.6 | 55.3 / 53.4 / 55.6 | 55.3 |
-  | poro2-8b-q8_0 | 42.3 | 127.4 / 127.9 / 128.7 | 127.9 |
-  | eurollm-9b-q8_0 | 48.3 | 139.1 / 141.2 / 140.9 | 140.9 |
-  | qwen3.8-27b-q5_k_xl | 422.0 | 479.8 / 507.9 / 512.0 | 507.9 |
-  | qwen3.8-27b-q6_k | 818.5 | 1161.3 / 1211.4 / 1212.4 | 1211.4 |
-  | qwen3-32b-q5_k_m | 185.7 | 405.7 / 431.9 / 431.0 | 431.0 |
-  | qwen3-coder-30b-a3b-q6_k | 44.0 | 181.5 / 179.6 / 179.5 | 179.6 |
-  | qwen3.5-35b-a3b-q6_k | 48.3 | 187.7 / 186.7 / 186.9 | 186.9 |
-  | poro2-70b-q4_k_m | 199.0 | 1146.6 / 1179.4 / 1181.3 | 1179.4 |
-  | gpt-oss-120b-mxfp4 | 116.5 | 368.7 / 370.3 / 391.1 | 370.3 |
+  | qwen3-4b-q8_0 | 27.6 | 53.8 / 54.8 / 55.4 | 54.8 |
+  | poro2-8b-q8_0 | 42.3 | 118.4 / 120.0 / 120.3 | 120.0 |
+  | eurollm-9b-q8_0 | 48.3 | 141.9 / 143.5 / 143.0 | 143.0 |
+  | qwen3.8-27b-q5_k_xl | 422.0 | 481.6 / 509.7 / 514.0 | 509.7 |
+  | qwen3.8-27b-q6_k | 818.5 | 1206.6 / 1210.6 / 1207.3 | 1207.3 |
+  | qwen3-32b-q5_k_m | 185.7 | 401.0 / 431.7 / 428.3 | 428.3 |
+  | qwen3-coder-30b-a3b-q6_k | 44.0 | 181.3 / 179.3 / 181.2 | 181.2 |
+  | qwen3.5-35b-a3b-q6_k | 48.3 | 188.5 / 188.2 / 187.6 | 188.2 |
+  | poro2-70b-q4_k_m | 199.0 | 1164.7 / 1183.6 / 1186.1 | 1183.6 |
+  | gpt-oss-120b-mxfp4 | 116.5 | 365.3 / 366.8 / 393.8 | 366.8 |
 
-  It is a **larger** number than the warm column it replaced (+20…+493% on Vulkan, +58…+397% on
+  It is a **larger** number than the warm column it replaced (+21…+495% on Vulkan, +58…+386% on
   ROCm) because a warm request re-used the prompt cache and evaluated one token, while a cold
   request prefills all 46. That is the trade for stability: across the 20 cell/backend pairs the
   warm column's median per-request spread was 53 ms (max 823 ms, `ttft_ms`/`p50` up to 2.11),
-  cold is 3 ms median (max 51 ms, ratio ≤ 1.04). Two Vulkan cold passes agree on `p50` within
-  **−1.2…+2.1%**, and `tg_server_tps` moved ≤0.3% per cell on Vulkan (≤0.4% mean on ROCm) between
-  the cold and warm passes — the erase changes what TTFT measures and nothing else.
+  cold is 3 ms median (max 51 ms, ratio ≤ 1.04). The protocol does not move `server tg`: across
+  the four published cold passes it sits within ±0.4% per cell of the warm runs on ROCm and
+  within ±0.3% on Vulkan apart from one cell (−3.2%, Qwen3-Coder-30B-A3B) — the erase changes
+  what TTFT measures and nothing else. What it costs is reproducibility at the cell level: two
+  quiet passes per backend move `p50` by up to −6.2% (Vulkan, Poro 2 8B) and −7.9% (ROCm,
+  gpt-oss) on the worst cell, and by a 0.4–0.8% median (§3c table).
 
   What it does not fix is model-specific prefill cost: cold, the 27B Q6_K cell still takes
   **1.21 s** on Vulkan (0.36 s on ROCm) and the 70B 1.18 s (0.55 s), because prefilling 46 tokens

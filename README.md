@@ -392,6 +392,7 @@ What is pinned, and where:
 |---|---|
 | `scripts/run_sweep.py` | the sweep driver (stdlib + PyYAML) |
 | `scripts/download_models.sh` | one-time fetch of the GGUF files in `matrix.yaml` (nothing downloads during a run) |
+| `scripts/make_extracts.py` | regenerates the tracked extracts from `results/run-*/` and has a `--check` mode (`--stats` prints the numbers `docs/RUNNING.md` §3c quotes) |
 | `scripts/sampler.py`, `scripts/ttft_probe.py` | stdlib helpers: power/VRAM trace, TTFT probe |
 | `scripts/finbench.py` | FIN-bench-v2 driver (stdlib + PyYAML + Jinja2) |
 | `scripts/fetch_finbench_upstream.py` | refreshes the vendored upstream prompt templates |
